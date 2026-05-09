@@ -196,16 +196,25 @@ local last_position_signature = nil
 
 -- first_capture state machine.
 --   "idle"        : nothing armed
---   "post_catch"  : party size just went 1 → 2 off Oak's Lab. Waiting for the
---                   first tile of player movement before firing.
+--   "post_catch"  : party size just went 1 → 2 off Oak's Lab. Counting
+--                   subsequent player tile-changes; fires when count reaches
+--                   POST_CAPTURE_TILE_DELAY.
 --   "fired"       : POST sent. One-shot per session — never re-arms.
 local first_capture_state = "idle"
 local first_capture_anchor_position = nil  -- position sig at the moment of catch
+local first_capture_tile_count = 0
 
 -- second_capture state machine. Same shape as first_capture; fires on the
 -- 2 → 3 party-size transition (player's second wild catch — total mons = 3).
 local second_capture_state = "idle"
 local second_capture_anchor_position = nil
+local second_capture_tile_count = 0
+
+-- How many tile-changes after the catch before the rival cinematic fires.
+-- Edmund's spec (2026-05-09): two steps post-catch, then the rival call /
+-- approach kicks in. Single source of truth so first_capture and
+-- second_capture stay aligned.
+local POST_CAPTURE_TILE_DELAY = 2
 
 -- The trigger string from the most-recently-fired rival_event. Read by the
 -- battle-entry watcher to pick battle_id (battle_2_first_capture vs.
@@ -1199,28 +1208,37 @@ local function check_rival_triggers()
   then
     first_capture_state = "post_catch"
     first_capture_anchor_position = position_sig
+    first_capture_tile_count = 0
     write_line(string.format(
-      "first_capture armed: caught at %s — waiting one tile of movement",
-      position_sig
+      "first_capture armed: caught at %s — waiting %d tiles of movement",
+      position_sig, POST_CAPTURE_TILE_DELAY
     ))
   end
 
   if first_capture_state == "post_catch"
-     and first_capture_anchor_position
      and previous_position_sig
-     and position_sig ~= first_capture_anchor_position
+     and previous_position_sig ~= position_sig
   then
-    -- Player moved one tile after the catch. Fire the cinematic.
-    if pending then
-      -- Don't lose the trigger — leave state armed; we'll retry next frame.
+    first_capture_tile_count = first_capture_tile_count + 1
+    write_line(string.format(
+      "first_capture tile %d/%d",
+      first_capture_tile_count, POST_CAPTURE_TILE_DELAY
+    ))
+    if first_capture_tile_count >= POST_CAPTURE_TILE_DELAY then
+      if pending then
+        -- Leave state armed; the next frame retries with `pending` cleared.
+        -- Roll the count back so we don't double-count when retrying.
+        first_capture_tile_count = first_capture_tile_count - 1
+        return
+      end
+      first_capture_state = "fired"
+      local party = read_party_data()
+      fire_rival_event("first_capture", state, party, {
+        anchor = first_capture_anchor_position,
+        tiles = POST_CAPTURE_TILE_DELAY,
+      })
       return
     end
-    first_capture_state = "fired"
-    local party = read_party_data()
-    fire_rival_event("first_capture", state, party, {
-      anchor = first_capture_anchor_position,
-    })
-    return
   end
 
   -- ----- second_capture detector --------------------------------------------
@@ -1234,24 +1252,35 @@ local function check_rival_triggers()
   then
     second_capture_state = "post_catch"
     second_capture_anchor_position = position_sig
+    second_capture_tile_count = 0
     write_line(string.format(
-      "second_capture armed: 3rd mon obtained at %s — waiting one tile",
-      position_sig
+      "second_capture armed: 3rd mon obtained at %s — waiting %d tiles",
+      position_sig, POST_CAPTURE_TILE_DELAY
     ))
   end
 
   if second_capture_state == "post_catch"
-     and second_capture_anchor_position
      and previous_position_sig
-     and position_sig ~= second_capture_anchor_position
+     and previous_position_sig ~= position_sig
   then
-    if pending then return end  -- leave armed; retry next frame
-    second_capture_state = "fired"
-    local party = read_party_data()
-    fire_rival_event("second_capture", state, party, {
-      anchor = second_capture_anchor_position,
-    })
-    return
+    second_capture_tile_count = second_capture_tile_count + 1
+    write_line(string.format(
+      "second_capture tile %d/%d",
+      second_capture_tile_count, POST_CAPTURE_TILE_DELAY
+    ))
+    if second_capture_tile_count >= POST_CAPTURE_TILE_DELAY then
+      if pending then
+        second_capture_tile_count = second_capture_tile_count - 1
+        return
+      end
+      second_capture_state = "fired"
+      local party = read_party_data()
+      fire_rival_event("second_capture", state, party, {
+        anchor = second_capture_anchor_position,
+        tiles = POST_CAPTURE_TILE_DELAY,
+      })
+      return
+    end
   end
 end
 
