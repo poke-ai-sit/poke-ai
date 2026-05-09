@@ -869,8 +869,9 @@ local function check_battle_transitions()
   -- We're in a battle. Bootstrap battle_id from current map if not set.
   if not in_battle then
     local state = read_game_state()
+    local sig = nil
     if state then
-      local sig = string.format("%d:%d", state.map_group, state.map_num)
+      sig = string.format("%d:%d", state.map_group, state.map_num)
       current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
     end
     if current_battle_id then
@@ -881,6 +882,60 @@ local function check_battle_transitions()
         "BATTLE START: id=%s",
         current_battle_id
       ))
+
+      -- Hour 4: gather both parties + POST /rival-battle-plan so the AI hook
+      -- in BattleAI_ChooseMoveOrAction picks up the score boosts on Gary's
+      -- first move. Player party comes from the live gPokelivePartyData
+      -- struct (already populated by UpdateCodexPartyData when the rival
+      -- battle script ran). Rival party is reconstructed from gBattleMons
+      -- slots 1 and 3 — only the active mon is fully visible mid-battle, so
+      -- the bridge plan reasons mostly off the player party + battle_id
+      -- archetype.
+      local player_party_full = read_party_data()
+      local player_party_for_plan = {}
+      if player_party_full then
+        for _, e in ipairs(player_party_full) do
+          player_party_for_plan[#player_party_for_plan + 1] = {
+            species = e.species,
+            level = e.level,
+            hp = e.hp,
+            max_hp = e.max_hp,
+            moves = e.moves,
+          }
+        end
+      else
+        -- Fallback: just use player active slot 0
+        local pm = read_battle_mon(0)
+        if pm.species ~= 0 then
+          player_party_for_plan[1] = pm
+        end
+      end
+
+      local rival_party_for_plan = {}
+      for _, slot in ipairs({1, 3}) do
+        local rm = read_battle_mon(slot)
+        if rm.species ~= 0 then
+          rival_party_for_plan[#rival_party_for_plan + 1] = rm
+        end
+      end
+
+      if #player_party_for_plan > 0 then
+        write_line(string.format(
+          "POST /rival-battle-plan id=%s player_party=%d rival_active=%d",
+          current_battle_id, #player_party_for_plan, #rival_party_for_plan
+        ))
+        local _, err = post_rival_battle_plan(
+          current_battle_id,
+          player_party_for_plan,
+          #rival_party_for_plan > 0 and rival_party_for_plan or nil,
+          state
+        )
+        if err then
+          write_line("rival-battle-plan POST failed: " .. tostring(err))
+        end
+      else
+        write_line("rival-battle-plan skipped: no player party data available")
+      end
     end
     return
   end
@@ -1027,6 +1082,8 @@ local function poll_pending_response()
     elseif pending.label == "rival-battle-plan" then
       local move_scores = extract_json_int_array(response, "move_scores")
       local counter_choice = extract_json_int(response, "counter_choice")
+      local opening_taunt = extract_json_field(response, "opening_taunt")
+      local strategy_summary = extract_json_field(response, "strategy_summary")
       if move_scores and #move_scores >= 4 then
         local ok, reason = write_rival_ai_plan(move_scores, counter_choice)
         if ok then
@@ -1040,6 +1097,16 @@ local function poll_pending_response()
         end
       else
         write_line("rival-battle-plan: missing or short move_scores in response")
+      end
+      -- Hour 4 (Option B): print Gary's opening taunt to the script panel so
+      -- the judge can see/narrate it. Routing through gRivalEncounterBuffer
+      -- isn't viable mid-battle (the encounter cinematic only fires from a
+      -- map_script_2 frame handler on the overworld, not inside a battle).
+      if opening_taunt and #opening_taunt > 0 then
+        write_line('Gary opening taunt: "' .. opening_taunt .. '"')
+      end
+      if strategy_summary and #strategy_summary > 0 then
+        write_line("Gary strategy: " .. strategy_summary)
       end
     elseif pending.label == "rival-battle-summary" then
       write_line("Battle summary acknowledged by bridge.")

@@ -220,8 +220,8 @@ The rival reasons about game state, remembers past player encounters, walks towa
 - [x] **Validated in mGBA:** addresses correct (Charmander/Scratch, Squirtle/Tackle read out of `gBattleMons` / `gCurrentMove`); Battle 1 in Oak's Lab logged 6 turns and produced a RESULT entry in `agents/rival/memory.md`
 
 **What's next**
-- [ ] **Hour 4 — fire `/rival-battle-plan` at battle entry.** Currently nothing calls `post_rival_battle_plan(...)`, so `gRivalAIBuffer.active` stays 0 and Gary uses canon AI. Need: in `check_battle_transitions()`, on the `outcome == 0` first-frame transition (or via a custom EWRAM byte set by the battle script), gather both parties via `read_battle_mon(0..3)` and POST. Verify Gary's first move shifts vs. a control battle.
-- [ ] **Hour 4 — display `opening_taunt`.** Either route through the existing `gRivalEncounterBuffer` mailbox or print to script panel for v1.
+- [x] **Hour 4 — fire `/rival-battle-plan` at battle entry.** `check_battle_transitions()` now POSTs on the first observed `outcome == 0` bootstrap frame: full player party from `gPokelivePartyData` + active rival slots 1/3 from `gBattleMons`. Single-pending guard at the top of the function prevents double-fire. Lua-side mGBA validation pending (no graphical test environment available here).
+- [x] **Hour 4 — display `opening_taunt`.** Routed to script panel only (Option B). The existing `gRivalEncounterBuffer` cinematic relies on a map_script_2 frame handler on the overworld, which does not fire mid-battle, so Option A wasn't viable for v1. Strategy summary also printed for narration.
 - [ ] **Hour 5 — Battle 2.** New trainer `TRAINER_AI_RIVAL_ROUTE_1`, Route 1 walk-up cinematic, party balanced against likely player team.
 - [ ] **Hour 6 — Battle 3.** Pewter Gym entrance, same pattern. Optional: pagination for `opening_taunt > 45` chars.
 - [ ] **Hour 7 — demo dry-run.** Full playthrough start → Battle 3, with `agents/rival/memory.md` tail visible to judges.
