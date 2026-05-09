@@ -152,6 +152,12 @@ def plan_battle(
         f"the player's is in 'Player party'.\n\n"
         f"## Output\n"
         f"You must output ONE JSON object with exactly these keys:\n"
+        f"  reasoning_steps: array of 2-4 short strings (under 60 chars each)\n"
+        f"                   showing your step-by-step thinking BEFORE deciding.\n"
+        f"                   E.g. [\"Player leads Charmander (Fire type)\",\n"
+        f"                         \"Squirtle has type advantage\",\n"
+        f"                         \"Boost Water Gun slot +15\"].\n"
+        f"                   This is shown to the audience — be specific.\n"
         f"  counter_choice: integer 0-2 — which of your party slots leads.\n"
         f"  move_scores: array of 4 integers in range [-20, 20] — additive\n"
         f"               boosts to your lead's move scoring. Index 0 is move 1.\n"
@@ -182,6 +188,13 @@ def plan_battle(
         logging.exception("plan_battle GPT call failed: %s", e)
         raw = {}
 
+    raw_steps = raw.get("reasoning_steps", [])
+    reasoning_steps: list[str] = (
+        [str(s)[:80] for s in raw_steps[:4]]
+        if isinstance(raw_steps, list)
+        else []
+    )
+
     counter_choice = int(raw.get("counter_choice", 0))
     counter_choice = max(0, min(2, counter_choice))
 
@@ -201,13 +214,14 @@ def plan_battle(
     strategy_summary = str(raw.get("strategy_summary", "")).strip()[:_SUMMARY_MAX_CHARS]
 
     # Persist the strategy decision so future plan_battle calls can see it.
-    _record_battle_plan(battle_id, counter_choice, move_scores, strategy_summary)
+    _record_battle_plan(battle_id, counter_choice, move_scores, strategy_summary, reasoning_steps)
 
     return {
         "counter_choice": counter_choice,
         "move_scores": move_scores,
         "opening_taunt": opening_taunt,
         "strategy_summary": strategy_summary,
+        "reasoning_steps": reasoning_steps,
     }
 
 
@@ -216,6 +230,7 @@ def _record_battle_plan(
     counter_choice: int,
     move_scores: list[int],
     strategy: str,
+    reasoning_steps: list[str] | None = None,
 ) -> None:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
     label = BATTLE_ID_LABELS.get(battle_id, battle_id)
@@ -224,6 +239,8 @@ def _record_battle_plan(
         f"Counter choice: party slot {counter_choice}",
         f"Move score boosts: {move_scores}",
     ]
+    if reasoning_steps:
+        lines.append("Reasoning: " + " → ".join(reasoning_steps))
     if strategy:
         lines.append(f"Strategy: {strategy}")
     _append_memory("\n".join(lines))
