@@ -460,6 +460,7 @@ gSpecials::
 	def_special UpdateCodexPartyData
 	def_special IsRivalEncounterPending
 	def_special BufferRivalMessage
+	def_special EvolveCustomPokemon
 	def_special CreateEnemyEventMon
 	def_special GetAIRivalCounterChoice
 	def_special ResetRivalCallPageIndex
