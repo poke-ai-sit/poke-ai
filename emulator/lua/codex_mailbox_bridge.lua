@@ -150,12 +150,10 @@ local CHOSEN_MOVE_OFFSET      = 0x87        -- chosenMovePositions[battler] u8
 local BATTLE_MONS_ADDR        = 0x02023C04  -- gBattleMons[0]
 local BATTLE_MON_STRIDE       = 0x58        -- 88 bytes per BattlePokemon
 
--- gRivalAIBuffer (pokefirered.map, MODERN=1 build 2026-05-09).
--- Previous value 0x02021ba0 was wrong; counterChoice + move scores were
--- being written into stale generic EWRAM, so C-side reads returned 0 and
--- the trainer dispatch always fell through to case 0 (anti-fire) regardless
--- of what the bridge picked.
-local RIVAL_AI_BUFFER_ADDR    = 0x0203F7F4
+-- gRivalAIBuffer: verified from pokefirered.map (agbcc/standard build 2026-05-09).
+-- agbcc build: 0x0203F75C  ← correct for pokefirered with MODERN=0 (our ROM)
+-- MODERN=1/gcc build places it at 0x0203F7F4 — do NOT use that value here.
+local RIVAL_AI_BUFFER_ADDR    = 0x0203F75C
 local RIVAL_AI_BUFFER_MAGIC   = 0x52414942  -- "RAIB"
 
 -- Field offsets within each gBattleMons[i] entry
@@ -462,7 +460,7 @@ end
 
 -- gRivalAIBuffer layout (matches struct in include/pokelive_rival_ai.h):
 --   off 0..3  : u32 magic
---   off 4     : u8  active        (1 = plan loaded; C hook clears to 0 after first turn)
+--   off 4     : u8  active        (1 = plan loaded; Lua clears it at battle end)
 --   off 5..8  : s8  moveScore[4]
 --   off 9     : u8  counterChoice
 --   off 10    : u8  resultPending
@@ -488,6 +486,11 @@ local function write_rival_ai_plan(move_scores, counter_choice)
   end
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE, 1)  -- arm LAST
   return true
+end
+
+local function clear_rival_ai_plan()
+  if RIVAL_AI_BUFFER_ADDR == 0 then return end
+  emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE, 0)
 end
 
 local function read_game_state()
@@ -1007,6 +1010,7 @@ local function append_battle_log(side, actor_species, move_name, result)
 end
 
 local function reset_battle_state()
+  clear_rival_ai_plan()
   in_battle = false
   current_battle_id = nil
   current_turn = 0

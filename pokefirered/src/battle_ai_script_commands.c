@@ -393,7 +393,6 @@ u8 BattleAI_ChooseMoveOrAction(void)
                 if (boost < -20) boost = -20;
                 AI_THINKING_STRUCT->score[j] += boost;
             }
-            gRivalAIBuffer.active = 0;
         }
     }
 
