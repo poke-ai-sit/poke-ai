@@ -97,7 +97,11 @@ static EWRAM_DATA u8 sCodexPromptBuffer[CODEX_INPUT_LENGTH + 1] = {0};
 EWRAM_DATA struct PokeliveCodexMailbox gPokeliveCodexMailbox = {0};
 EWRAM_DATA struct PokelivePartyData gPokelivePartyData = {0};
 EWRAM_DATA struct PokeliveRivalEncounter gRivalEncounterBuffer = {0};
-EWRAM_DATA struct PokeliveRivalAIBuffer gRivalAIBuffer = {0};
+EWRAM_DATA struct PokeliveRivalAIBuffer gRivalAIBuffer = {
+    /* partyMagic is the alignment sentinel; Lua reads this before writing
+     * the partyOverride slots and bails loudly if it doesn't match. */
+    .partyMagic = POKELIVE_RIVAL_PARTY_SENTINEL,
+};
 
 static const u8 sCodexAdvicePrompt[] = _("What should I do next.");
 static const u8 sCodexEvolvePrompt[] = _("Evolve my custom Pokemon.");

@@ -19,15 +19,26 @@ struct PokeliveRivalPartySlot
     u16 moves[4];
 };
 
+/* Layout-locked. The Lua bridge writes into this struct by absolute
+ * offset, so the offsets here must match the constants in
+ * codex_mailbox_bridge.lua. We force partyOverride to start at a 4-byte
+ * aligned offset (16) by inserting a u32 sentinel at offset 12. Lua
+ * reads partyMagic before writing slots; if it sees anything other
+ * than POKELIVE_PARTY_MAGIC, the struct shifted under it (e.g. someone
+ * reordered fields without updating the Lua offsets) and we surface a
+ * loud "STRUCT MISMATCH" error instead of writing into the wrong byte. */
+#define POKELIVE_RIVAL_PARTY_SENTINEL 0xCAFEBABE
+
 struct PokeliveRivalAIBuffer
 {
-    u32 magic;
-    u8  active;
-    s8  moveScore[4];
-    u8  counterChoice;       /* legacy field, still readable by GetAIRivalCounterChoice */
-    u8  resultPending;
-    u8  partyOverrideCount;  /* 0 = no override, 1..6 = use partyOverride[] */
-    u8  pad[2];
+    u32 magic;                    /* offset  0..3  — buffer-init marker  */
+    u8  active;                   /* offset  4     — battle-AI move plan */
+    s8  moveScore[4];             /* offset  5..8  */
+    u8  counterChoice;            /* offset  9     */
+    u8  resultPending;            /* offset 10     */
+    u8  partyOverrideCount;       /* offset 11     — 0=no override; 1..6=use partyOverride[] */
+    u32 partyMagic;               /* offset 12..15 — alignment + sentinel for Lua verify */
+    /* offset 16: struct partyOverride[6], 12 bytes per slot, 72 bytes total */
     struct PokeliveRivalPartySlot partyOverride[POKELIVE_RIVAL_OVERRIDE_MAX];
 };
 

@@ -520,8 +520,8 @@ end
 --   off  9    : u8  counterChoice
 --   off 10    : u8  resultPending
 --   off 11    : u8  partyOverrideCount (0 = no override; 1..6 = use partyOverride)
---   off 12..13: u8  pad[2]
---   off 14..  : struct PokeliveRivalPartySlot partyOverride[6]
+--   off 12..15: u32 partyMagic         (alignment sentinel — must read 0xCAFEBABE if struct aligned)
+--   off 16..  : struct PokeliveRivalPartySlot partyOverride[6]
 --                each slot is 12 bytes:
 --                  +0  u16 species
 --                  +2  u8  level
@@ -532,7 +532,9 @@ local RIVAL_AI_OFF_MOVE_SCORE            = 5
 local RIVAL_AI_OFF_COUNTER_CHOICE        = 9
 local RIVAL_AI_OFF_RESULT_PENDING        = 10
 local RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT  = 11
-local RIVAL_AI_OFF_PARTY_OVERRIDE_BASE   = 14
+local RIVAL_AI_OFF_PARTY_MAGIC           = 12
+local RIVAL_AI_PARTY_MAGIC_VALUE         = 0xCAFEBABE
+local RIVAL_AI_OFF_PARTY_OVERRIDE_BASE   = 16
 local RIVAL_AI_PARTY_SLOT_STRIDE         = 12
 local RIVAL_AI_PARTY_SLOT_OFF_SPECIES    = 0
 local RIVAL_AI_PARTY_SLOT_OFF_LEVEL      = 2
@@ -952,6 +954,23 @@ end
 -- only fires when count > 0).
 local function write_party_override(slots)
   if RIVAL_AI_BUFFER_ADDR == 0 then return false, "RIVAL_AI_BUFFER_ADDR unset" end
+
+  -- Verify struct alignment via the C-side sentinel. If the actual
+  -- partyMagic value at offset 12 doesn't match POKELIVE_RIVAL_PARTY_SENTINEL,
+  -- the C compiler placed our partyOverride[] at a different offset than
+  -- Lua expects — writing slots will silently overwrite the wrong bytes
+  -- and the rival will show up with whatever junk lives there (e.g.
+  -- the L84 PRATA PRO bug). Loud-fail instead of pretending to work.
+  local sentinel = emu:read32(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_MAGIC)
+  if sentinel ~= RIVAL_AI_PARTY_MAGIC_VALUE then
+    write_line(string.format(
+      "STRUCT MISMATCH: gRivalAIBuffer.partyMagic at offset %d reads 0x%08X (expected 0x%08X). " ..
+      "C struct layout differs from Lua's expectation; abort override write.",
+      RIVAL_AI_OFF_PARTY_MAGIC, sentinel, RIVAL_AI_PARTY_MAGIC_VALUE
+    ))
+    return false, "struct mismatch — C/Lua offsets disagree"
+  end
+
   if not slots or #slots == 0 then
     -- Clear any previously-written override so the next battle uses the
     -- static base party.
