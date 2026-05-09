@@ -1095,6 +1095,53 @@ local function check_battle_transitions()
           post_rival_battle_summary(current_battle_id, outcome_label, battle_log, nil)
         end
       end
+
+      -- BATTLE_OUTCOME_CAUGHT (=7) is the canonical "player caught a wild
+      -- Pokemon" signal — read it straight from gBattleOutcome the moment
+      -- the battle exits. Belt-and-braces with check_rival_triggers'
+      -- party-count delta detector: whichever observes the post-catch
+      -- transition first arms the state machine, the other no-ops because
+      -- of the *_state == "idle" guard. Hook here gives us a single,
+      -- unambiguous "this was a capture" event instead of polling.
+      if outcome == BATTLE_OUTCOME_CAUGHT then
+        local pc = read_party_count()
+        local post_state = read_game_state()
+        if pc and post_state then
+          local capture_map_sig = string.format(
+            "%d:%d", post_state.map_group, post_state.map_num
+          )
+          local capture_pos_sig = string.format(
+            "%d:%d:%d:%d",
+            post_state.map_group, post_state.map_num,
+            post_state.x, post_state.y
+          )
+          if pc == 2 and first_capture_state == "idle"
+             and capture_map_sig ~= OAKS_LAB_MAP_SIG then
+            first_capture_state = "post_catch"
+            first_capture_anchor_position = capture_pos_sig
+            first_capture_tile_count = 0
+            write_line(string.format(
+              "first_capture armed via CAUGHT: caught at %s — waiting %d tiles",
+              capture_pos_sig, POST_CAPTURE_TILE_DELAY
+            ))
+          elseif pc == 3 and second_capture_state == "idle"
+                 and first_capture_state == "fired" then
+            second_capture_state = "post_catch"
+            second_capture_anchor_position = capture_pos_sig
+            second_capture_tile_count = 0
+            write_line(string.format(
+              "second_capture armed via CAUGHT: caught at %s — waiting %d tiles",
+              capture_pos_sig, POST_CAPTURE_TILE_DELAY
+            ))
+          end
+          -- Sync the trackers so check_rival_triggers next frame doesn't
+          -- double-arm via party-count delta and re-fire the same trigger.
+          last_party_count = pc
+          last_position_signature = capture_pos_sig
+          last_map_signature = capture_map_sig
+        end
+      end
+
       reset_battle_state()
     end
     last_outcome_seen = outcome
