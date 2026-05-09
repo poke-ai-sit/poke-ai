@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --fr-navy:   #18204b;
+  --fr-red:    #b81818;
+  --fr-cream:  #f8f8e8;
+  --fr-border: #181818;
+  --fr-shadow: #585858;
+  --fr-white:  #ffffff;
+  --fr-gray:   #a8a8a8;
+  --fr-dark:   #383838;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--fr-navy);
+  color: var(--fr-border);
+  font-family: var(--font-pixel), monospace;
+  min-height: 100vh;
+}
+
+/* Authentic FireRed panel border */
+.fr-panel {
+  background: var(--fr-cream);
+  border: 4px solid var(--fr-border);
+  box-shadow:
+    inset 2px 2px 0 var(--fr-white),
+    inset -2px -2px 0 var(--fr-shadow);
+}
+
+.fr-panel-red {
+  background: var(--fr-cream);
+  border: 4px solid var(--fr-red);
+  box-shadow:
+    inset 2px 2px 0 #ff6060,
+    inset -2px -2px 0 #800000;
+}
+
+.fr-panel-dialog {
+  background: var(--fr-cream);
+  border: 4px solid var(--fr-border);
+  box-shadow:
+    inset 2px 2px 0 var(--fr-white),
+    inset -2px -2px 0 var(--fr-shadow),
+    4px 4px 0 rgba(0, 0, 0, 0.4);
+}
+
+.fr-btn {
+  background: var(--fr-navy);
+  color: var(--fr-cream);
+  border: 4px solid var(--fr-border);
+  box-shadow:
+    inset 2px 2px 0 #4a5699,
+    inset -2px -2px 0 #0a0e26;
+  padding: 10px 20px;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: filter 0.1s;
+  text-transform: uppercase;
+}
+
+.fr-btn:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.fr-btn:active:not(:disabled) {
+  box-shadow:
+    inset -2px -2px 0 #4a5699,
+    inset 2px 2px 0 #0a0e26;
+  transform: translate(1px, 1px);
+}
+
+.fr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fr-btn-red {
+  background: var(--fr-red);
+  box-shadow:
+    inset 2px 2px 0 #e84040,
+    inset -2px -2px 0 #800000;
+}
+
+/* Sprite display — no browser smoothing */
+.sprite-display {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Loading dots animation */
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; }
+  33%       { opacity: 0; }
+  66%       { opacity: 0; }
+}
+@keyframes dot-blink-2 {
+  0%, 33%   { opacity: 0; }
+  50%, 100% { opacity: 1; }
+  85%       { opacity: 0; }
+}
+@keyframes dot-blink-3 {
+  0%, 55%   { opacity: 0; }
+  70%, 100% { opacity: 1; }
+}
+
+.loading-dot-1 { animation: dot-blink 1.2s infinite; }
+.loading-dot-2 { animation: dot-blink-2 1.2s infinite; }
+.loading-dot-3 { animation: dot-blink-3 1.2s infinite; }
+
+/* Scanline overlay for GBA feel */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
