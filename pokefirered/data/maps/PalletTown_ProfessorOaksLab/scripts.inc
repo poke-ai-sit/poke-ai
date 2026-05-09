@@ -987,7 +987,16 @@ PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexBalls::
 	end
 
 PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveStub::
-	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub, MSGBOX_DEFAULT
+	special EvolveCustomPokemon
+	goto_if_eq VAR_RESULT, TRUE, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveSuccess
+	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveNoPrata, MSGBOX_DEFAULT
+	release
+	end
+
+PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveSuccess::
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveSuccess, MSGBOX_DEFAULT
+	waitfanfare
 	release
 	end
 
@@ -1021,8 +1030,11 @@ PalletTown_ProfessorOaksLab_Text_ProfessorCodexAskPrompt:
 PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveConfirm:
 	.string "EVOLVE YOUR CUSTOM POKEMON?$"
 
-PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub:
-	.string "EVOLUTION TOOL IS NEXT.$"
+PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveSuccess:
+	.string "PRATA evolved into\nPRATA PRO!$"
+
+PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveNoPrata:
+	.string "No PRATA in your party.$"
 
 PalletTown_ProfessorOaksLab_Text_ProfessorCodexThinking:
 	.string "GPT5.5 IS THINKING.$"

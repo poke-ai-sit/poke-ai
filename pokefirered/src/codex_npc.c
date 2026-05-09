@@ -261,3 +261,24 @@ void BufferRivalMessage(void)
         StringCopy(gStringVar1, gRivalEncounterBuffer.message);
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
 }
+
+void EvolveCustomPokemon(void)
+{
+    u16 species;
+    u16 newSpecies;
+    int i;
+
+    for (i = 0; i < gPlayerPartyCount; i++)
+    {
+        species = GetMonData(&gPlayerParty[i], MON_DATA_SPECIES, NULL);
+        if (species == SPECIES_CHARMANDER)
+        {
+            newSpecies = SPECIES_CHARMELEON;
+            SetMonData(&gPlayerParty[i], MON_DATA_SPECIES, &newSpecies);
+            CalculateMonStats(&gPlayerParty[i]);
+            gSpecialVar_Result = TRUE;
+            return;
+        }
+    }
+    gSpecialVar_Result = FALSE;
+}
