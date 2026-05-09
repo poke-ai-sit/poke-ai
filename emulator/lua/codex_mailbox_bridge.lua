@@ -489,12 +489,38 @@ local function write_rival_ai_plan(move_scores, counter_choice)
     emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_MOVE_SCORE + (i - 1), s)
   end
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE, 1)  -- arm LAST
+  -- Read back immediately to confirm EWRAM write landed
+  local rb_active, rb_scores = read_rival_ai_ewram()
+  if rb_active then
+    write_line(string.format(
+      "EWRAM verified: active=%d scores=[%d,%d,%d,%d] counter=%d",
+      rb_active,
+      rb_scores[1], rb_scores[2], rb_scores[3], rb_scores[4],
+      emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_COUNTER_CHOICE)
+    ))
+  else
+    write_line("EWRAM verify FAILED — RIVAL_AI_BUFFER_ADDR not set?")
+  end
   return true
 end
 
 local function clear_rival_ai_plan()
   if RIVAL_AI_BUFFER_ADDR == 0 then return end
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE, 0)
+end
+
+-- Reads the live EWRAM AI buffer and returns (active, scores_table).
+-- Converts s8 two's-complement bytes back to signed integers.
+local function read_rival_ai_ewram()
+  if RIVAL_AI_BUFFER_ADDR == 0 then return nil, nil end
+  local active = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE)
+  local scores = {}
+  for i = 0, 3 do
+    local b = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_MOVE_SCORE + i)
+    if b >= 128 then b = b - 256 end  -- unsigned byte → signed s8
+    scores[i + 1] = b
+  end
+  return active, scores
 end
 
 local function read_game_state()
@@ -1299,6 +1325,19 @@ local function check_battle_transitions()
       last_logged_rival_move = current_move
       last_logged_player_move = -1
       current_turn = current_turn + 1  -- crude turn counter; refine when verified
+      -- Show EWRAM AI state so we can verify whether the C hook applied boosts
+      -- when Gary chose this move. active=1 + nonzero scores = hook is working.
+      local ai_active, ai_scores = read_rival_ai_ewram()
+      if ai_active ~= nil then
+        local hint = ai_active == 1 and "AI BOOST ACTIVE" or "AI BOOST NOT ARMED"
+        write_line(string.format(
+          "  [AI] Gary MOVE_%d | EWRAM active=%d scores=[%d,%d,%d,%d] | %s",
+          current_move,
+          ai_active,
+          ai_scores[1], ai_scores[2], ai_scores[3], ai_scores[4],
+          hint
+        ))
+      end
     end
   end
 end
