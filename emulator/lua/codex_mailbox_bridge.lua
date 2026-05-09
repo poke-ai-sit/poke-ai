@@ -1048,14 +1048,21 @@ local function check_battle_transitions()
   local current_move = read_current_move()
 
   if current_move ~= 0 then
+    -- Per-side dedup: a single read of `current_move` may persist across many
+    -- frames while the move animation plays, so we suppress duplicates from
+    -- the same battler. Resetting the OTHER side's last_logged on each log
+    -- ensures repeated moves (rival Tackle every turn) still land in the
+    -- log when the fight passes through the alternate side first.
     if is_player_battler(attacker) and current_move ~= last_logged_player_move then
       local mon = read_battle_mon(attacker)
       append_battle_log("player", mon.species, string.format("MOVE_%d", current_move), nil)
       last_logged_player_move = current_move
+      last_logged_rival_move = -1
     elseif is_opponent_battler(attacker) and current_move ~= last_logged_rival_move then
       local mon = read_battle_mon(attacker)
       append_battle_log("rival", mon.species, string.format("MOVE_%d", current_move), nil)
       last_logged_rival_move = current_move
+      last_logged_player_move = -1
       current_turn = current_turn + 1  -- crude turn counter; refine when verified
     end
   end
@@ -1095,6 +1102,16 @@ local function check_rival_triggers()
   -- Grace window prevents the baseline party read from false-firing on hot
   -- reload (you typically already have 1 mon when the script attaches).
   if frame_count < RIVAL_GRACE_FRAMES then return end
+
+  -- Diagnostic: log every party-size change so we can verify the catch
+  -- detector is observing the 1→2 (and 2→3) transitions live in mGBA.
+  if previous_party_count and party_count and previous_party_count ~= party_count then
+    write_line(string.format(
+      "party-size delta: %d -> %d on map %s (first_capture=%s, second_capture=%s)",
+      previous_party_count, party_count, map_sig,
+      first_capture_state, second_capture_state
+    ))
+  end
 
   -- ----- first_capture detector ---------------------------------------------
   if first_capture_state == "idle"
