@@ -49,19 +49,25 @@ local OFFSET_RESPONSE = OFFSET_COMMAND + CODEX_INPUT_LENGTH + 1
 local CODEX_RESPONSE_LENGTH = 256
 
 local RESPONSE_TIMEOUT_SECONDS = 90
-local SEND_EVERY_FRAMES = 300
 
 -- "Try again." encoded in FireRed charset + EOS
 local TIMEOUT_RESPONSE_HEX = "CEE6ED00D5DBD5DDE2ADFF"
 
 -- ===========================================================================
--- AI Rival proactive encounters — SPRINT-005 Phase 2 (Lua side)
+-- AI Rival proactive encounters — SPRINT-005 Hours 5-6 (Lua side)
 -- ===========================================================================
--- Detect specific game events on every frame. When one fires AND we're on a
--- map that's in scope, POST to /rival-event so the bridge generates a Gary
--- response. Tonight (Phase 2) we only log the response — the actual in-game
--- cutscene trigger lands tomorrow once ROM Phase 3 defines the EWRAM struct
--- and frame-script handler.
+-- Two ONE-SHOT triggers fire the cinematic walk-up + Battle 2/Battle 3 setup:
+--
+--   first_capture:  party size goes 1 → 2 (off the canon Oak's Lab map)
+--                   → wait until player walks ONE more tile → POST /rival-event
+--                   → bridge picks counter_choice (anti-fire/water/grass/...)
+--                   → Lua writes counterChoice to gRivalAIBuffer + arms cinematic
+--
+--   second_capture: party size goes 2 → 3 (any map). Same 1-tile delay.
+--                   POSTs with battle 3 picker output.
+--
+-- Battle entry (any map_signature in BATTLE_ID_BY_MAP_SIGNATURE) keeps using
+-- /rival-battle-plan to populate moveScore[].
 --
 -- gRivalEncounterBuffer EWRAM contract (lives in pokefirered/src/codex_npc.c):
 --   struct PokeliveRivalEncounter {
@@ -73,7 +79,7 @@ local TIMEOUT_RESPONSE_HEX = "CEE6ED00D5DBD5DDE2ADFF"
 --   };  // total: 208 bytes
 -- Lua transitions IDLE → APPROACH_PENDING by writing magic + message + length
 -- + status, then flipping VAR_TEMP_0=1 in SaveBlock1.vars[0] to trigger the
--- map_script_2 entry in PalletTown_OnFrame.
+-- map_script_2 entry that the ROM team adds for each cinematic map.
 -- Address from pokefirered.map after build 2026-05-08 (post-merge with SPRINT-003).
 local RIVAL_ENCOUNTER_BUFFER_ADDR    = 0x0203f68c  -- gRivalEncounterBuffer
 local RIVAL_ENCOUNTER_MAGIC          = 0x52454E43  -- "RENC"
@@ -83,27 +89,16 @@ local RIVAL_ENCOUNTER_OFFSET_STATUS  = 4
 local RIVAL_ENCOUNTER_OFFSET_LENGTH  = 5
 local RIVAL_ENCOUNTER_OFFSET_MESSAGE = 8
 
--- VAR_TEMP_0 lives at SaveBlock1 + 0x1000 (vars[0], u16). The PalletTown
+-- VAR_TEMP_0 lives at SaveBlock1 + 0x1000 (vars[0], u16). The map_script_2
 -- frame script triggers when VAR_TEMP_0 == 1; the encounter script resets
 -- it back to 0 after running so it can fire again next time.
 local VAR_TEMP_0_OFFSET = 0x1000
 
--- Maps where the proactive rival can appear (Pallet Town → Pewter City).
--- Format: "map_group:map_num" → human-readable label.
-local RIVAL_ACTIVE_MAPS = {
-  ["3:0"]  = "Pallet Town",
-  ["3:1"]  = "Viridian City",
-  ["3:2"]  = "Pewter City",
-  ["3:19"] = "Route 1",
-  ["3:20"] = "Route 2",
-  ["1:0"]  = "Viridian Forest",
-}
+-- Map signatures we care about for the new triggers.
+local OAKS_LAB_MAP_SIG     = "4:3"
 
--- Cooldown: never two rival events within this many wall-clock seconds.
-local RIVAL_COOLDOWN_SECONDS = 60
-
--- Skip event detection during the first N frames after script load to avoid
--- firing on the baseline read (party_count was already 1, etc.).
+-- Skip event detection during the first N frames after script load so the
+-- baseline party-size read doesn't false-fire on hot-reload.
 local RIVAL_GRACE_FRAMES = 60
 
 -- Party-count byte lives at SaveBlock1 + 0x34 (verified in pokefirered global.h).
@@ -160,25 +155,54 @@ local function is_opponent_battler(battler_id)
   return battler_id == 1 or battler_id == 3
 end
 
--- Trigger map: which (group, num) entrances start which battle.
--- Used by the watcher to tag a captured battle log with the right battle_id.
+-- Battle 1 (Oak's Lab) is the only battle whose ID is determined purely by
+-- map. Battle 2 and Battle 3 fire anywhere the player walks one tile after
+-- their first / second wild capture, so they're keyed off the most recently
+-- fired rival trigger (see `last_rival_trigger` below) instead of map sig.
 local BATTLE_ID_BY_MAP_SIGNATURE = {
-  ["4:3"]  = "battle_1_oaks_lab",   -- Professor Oak's Lab interior
-  ["3:19"] = "battle_2_route_1",    -- Route 1 (proactive — fired by Lua trigger)
-  ["3:2"]  = "battle_3_pewter",     -- Pewter City (proactive — gym entrance)
+  ["4:3"]  = "battle_1_oaks_lab",   -- Professor Oak's Lab (canon)
+}
+
+-- Battle ID picked by which capture trigger fired most recently. Set by
+-- fire_rival_event(); read at battle entry; cleared once consumed so it
+-- doesn't bleed into a later battle.
+local BATTLE_ID_BY_TRIGGER = {
+  first_capture  = "battle_2_first_capture",
+  second_capture = "battle_3_second_capture",
 }
 
 local frame_count = 0
 local pending = nil
 local last_seq = nil
-local last_sent_state = nil
 local warned_unconfigured = false
 local warned_magic_mismatch = false
 
 -- Rival trigger state
 local last_party_count = nil
 local last_map_signature = nil
-local last_rival_event_time = 0
+
+-- Position tracker — used by the post-capture 1-tile delay logic for both
+-- first_capture and second_capture triggers. Format: "map_group:map_num:x:y".
+-- When this string changes between frames, the player has moved one tile.
+local last_position_signature = nil
+
+-- first_capture state machine.
+--   "idle"        : nothing armed
+--   "post_catch"  : party size just went 1 → 2 off Oak's Lab. Waiting for the
+--                   first tile of player movement before firing.
+--   "fired"       : POST sent. One-shot per session — never re-arms.
+local first_capture_state = "idle"
+local first_capture_anchor_position = nil  -- position sig at the moment of catch
+
+-- second_capture state machine. Same shape as first_capture; fires on the
+-- 2 → 3 party-size transition (player's second wild catch — total mons = 3).
+local second_capture_state = "idle"
+local second_capture_anchor_position = nil
+
+-- The trigger string from the most-recently-fired rival_event. Read by the
+-- battle-entry watcher to pick battle_id (battle_2_first_capture vs.
+-- battle_3_second_capture). Cleared once consumed so it doesn't bleed.
+local last_rival_trigger = nil
 
 -- Smart Gary battle log accumulator. Cleared at battle start, sent to
 -- /rival-battle-summary at battle end.
@@ -189,6 +213,16 @@ local battle_log = {}              -- list of {turn, side, actor_species, move, 
 local last_logged_player_move = -1
 local last_logged_rival_move = -1
 local last_outcome_seen = 0
+
+-- Hour 4b — deferred battle-plan POST.
+-- check_battle_transitions() used to early-return when `pending` was set, which
+-- caused Battle 1 (Oak's Lab) to silently miss its /rival-battle-plan POST: a
+-- /game-state POST queued by the player's last walking step into the lab was
+-- still in flight during the narrow window where the watcher would otherwise
+-- bootstrap. We now ALWAYS run the state machine; if the POST can't fire this
+-- frame because another request is in flight, we stash the payload here and
+-- retry next frame from the frame callback.
+local deferred_battle_plan = nil   -- { battle_id, player_party, rival_party, state }
 
 local decode_table = {
   [0x00] = " ",
@@ -523,16 +557,6 @@ local function post_json(path, body, success_marker, label, seq)
   return "request sent; waiting for response...", nil
 end
 
-local function post_game_state(state)
-  return post_json(
-    "/game-state",
-    json_game_state(state),
-    '"received":true',
-    "game-state",
-    nil
-  )
-end
-
 local function post_codex_chat(message, state, seq)
   return post_json(
     "/codex-chat",
@@ -651,11 +675,13 @@ local function read_party_count()
 end
 
 local function fire_rival_event(trigger, state, party, details)
-  last_rival_event_time = os.time()
   write_line(string.format(
     "RIVAL EVENT trigger=%s map=%d:%d pos=(%d,%d)",
     trigger, state.map_group, state.map_num, state.x, state.y
   ))
+  -- Remember which trigger fired so the battle-entry watcher can tag the
+  -- log with the right battle_id when the cinematic transitions to combat.
+  last_rival_trigger = trigger
   local response, err = post_rival_event(trigger, state, party, details)
   if err then
     write_line("rival-event POST failed: " .. tostring(err))
@@ -664,6 +690,20 @@ local function fire_rival_event(trigger, state, party, details)
   if response and #response > 0 then
     write_line(response)
   end
+end
+
+-- Writes counter_choice to gRivalAIBuffer.counterChoice without arming the
+-- moveScore plan. The /rival-battle-plan POST at battle entry is responsible
+-- for filling moveScore[] and flipping `active`. By writing counterChoice
+-- now (Hours 5-6), the rival trainer-load script (which reads the byte via
+-- GetRivalCounterChoice when the cinematic ends and the battle starts)
+-- picks the right team-slot bucket (0-11 contract, see rival_counter.py).
+-- We deliberately leave `active` alone — no move plan to apply yet.
+local function write_counter_choice_only(counter_choice)
+  if RIVAL_AI_BUFFER_ADDR == 0 then return false, "RIVAL_AI_BUFFER_ADDR unset" end
+  emu:write32(RIVAL_AI_BUFFER_ADDR, RIVAL_AI_BUFFER_MAGIC)
+  emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_COUNTER_CHOICE, counter_choice or 0)
+  return true
 end
 
 -- ---------------------------------------------------------------------------
@@ -821,6 +861,9 @@ local function reset_battle_state()
   last_logged_player_move = -1
   last_logged_rival_move = -1
   last_outcome_seen = 0
+  -- Drop any battle-plan POST that was queued for a battle that just ended
+  -- before its retry window came up — stale and would confuse the bridge.
+  deferred_battle_plan = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -835,16 +878,62 @@ end
 -- check_battle_transitions() inside the frame callback (after
 -- check_rival_triggers). See docs/HANDOFF_smart_gary.md.
 -- ---------------------------------------------------------------------------
-local function check_battle_transitions()
-  if pending then return end
-  local outcome = read_battle_outcome()
+-- Try to fire a battle-plan POST. If `pending` is busy, stash the payload in
+-- `deferred_battle_plan` and the frame callback will retry next frame.
+local function fire_or_defer_battle_plan(battle_id, player_party, rival_party, state)
+  if pending then
+    deferred_battle_plan = {
+      battle_id = battle_id,
+      player_party = player_party,
+      rival_party = rival_party,
+      state = state,
+    }
+    write_line(string.format(
+      "POST /rival-battle-plan deferred (pending=%s) id=%s",
+      tostring(pending and pending.label or "?"), battle_id
+    ))
+    return
+  end
+  write_line(string.format(
+    "POST /rival-battle-plan id=%s player_party=%d rival_active=%d",
+    battle_id, #player_party, rival_party and #rival_party or 0
+  ))
+  local _, err = post_rival_battle_plan(battle_id, player_party, rival_party, state)
+  if err then
+    write_line("rival-battle-plan POST failed: " .. tostring(err))
+  end
+end
 
-  -- ENTRY: was 0 → still 0 isn't a transition; was non-zero → 0 means a new
-  -- battle just started. We use `in_battle` flag to track logical state
-  -- because outcome=0 happens both pre-battle and during.
-  -- For simplicity: we treat the first observation of outcome=0 with
-  -- gBattlerAttacker valid as battle-in-progress.
-  -- (Edmund: refine this when validating in mGBA.)
+local function flush_deferred_battle_plan()
+  if not deferred_battle_plan or pending then return end
+  local d = deferred_battle_plan
+  deferred_battle_plan = nil
+  write_line(string.format(
+    "POST /rival-battle-plan (retry) id=%s player_party=%d rival_active=%d",
+    d.battle_id, #d.player_party, d.rival_party and #d.rival_party or 0
+  ))
+  local _, err = post_rival_battle_plan(d.battle_id, d.player_party, d.rival_party, d.state)
+  if err then
+    write_line("rival-battle-plan POST (retry) failed: " .. tostring(err))
+  end
+end
+
+-- Returns true iff the rival side of the battle struct shows a loaded mon —
+-- the most reliable signal that an actual battle (not just a stale outcome=0
+-- byte on the overworld) is currently active.
+local function rival_battler_is_loaded()
+  local rival_lead_species = emu:read16(BATTLE_MONS_ADDR + BATTLE_MON_STRIDE + BMON_SPECIES)
+  return rival_lead_species ~= 0
+end
+
+local function check_battle_transitions()
+  -- NOTE: we deliberately do NOT early-return on `pending`. Hour 4b regression:
+  -- a /game-state POST in flight during the player's lab-entry frame caused
+  -- Battle 1 to skip its plan POST. The watcher must always update its state
+  -- machine; only the outbound POST is gated (and deferred via
+  -- `deferred_battle_plan` when pending is busy).
+
+  local outcome = read_battle_outcome()
 
   if outcome ~= BATTLE_OUTCOME_IN_PROGRESS then
     if in_battle then
@@ -866,21 +955,90 @@ local function check_battle_transitions()
     return
   end
 
-  -- We're in a battle. Bootstrap battle_id from current map if not set.
+  -- outcome == 0. Bootstrap if not already in_battle. Hour 4b: require a
+  -- secondary signal (rival battler loaded in gBattleMons[1]) so we don't
+  -- false-positive on the overworld where outcome can also read 0.
   if not in_battle then
-    local state = read_game_state()
-    if state then
-      local sig = string.format("%d:%d", state.map_group, state.map_num)
-      current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
+    if not rival_battler_is_loaded() then
+      -- Still on overworld (or in pre-battle cinematic) — wait for the rival
+      -- battler to materialise. Don't touch in_battle yet.
+      return
     end
-    if current_battle_id then
+
+    local state = read_game_state()
+    local sig = nil
+    if state then
+      sig = string.format("%d:%d", state.map_group, state.map_num)
+      -- Trigger flag wins over map sig — Battle 2/3 can fire on any map,
+      -- only Battle 1 (Oak's Lab) is map-determined. Once consumed, clear
+      -- the flag so a later battle doesn't inherit it.
+      if last_rival_trigger and BATTLE_ID_BY_TRIGGER[last_rival_trigger] then
+        current_battle_id = BATTLE_ID_BY_TRIGGER[last_rival_trigger]
+        last_rival_trigger = nil
+      else
+        current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
+      end
+    end
+    if not current_battle_id then
+      -- Battle is real but on a map we don't track. Still mark in_battle so
+      -- exit detection works, but skip plan + summary POSTs.
       in_battle = true
       current_turn = 1
       battle_log = {}
-      write_line(string.format(
-        "BATTLE START: id=%s",
-        current_battle_id
-      ))
+      write_line(string.format("BATTLE START: id=<untracked> map=%s", tostring(sig)))
+      return
+    end
+
+    in_battle = true
+    current_turn = 1
+    battle_log = {}
+    write_line(string.format("BATTLE START: id=%s map=%s", current_battle_id, sig))
+
+    -- Hour 4: gather both parties + POST /rival-battle-plan so the AI hook
+    -- in BattleAI_ChooseMoveOrAction picks up the score boosts on Gary's
+    -- first move. Player party comes from the live gPokelivePartyData
+    -- struct (already populated by UpdateCodexPartyData when the rival
+    -- battle script ran). Rival party is reconstructed from gBattleMons
+    -- slots 1 and 3 — only the active mon is fully visible mid-battle, so
+    -- the bridge plan reasons mostly off the player party + battle_id
+    -- archetype.
+    local player_party_full = read_party_data()
+    local player_party_for_plan = {}
+    if player_party_full then
+      for _, e in ipairs(player_party_full) do
+        player_party_for_plan[#player_party_for_plan + 1] = {
+          species = e.species,
+          level = e.level,
+          hp = e.hp,
+          max_hp = e.max_hp,
+          moves = e.moves,
+        }
+      end
+    else
+      -- Fallback: use player active slot 0 from gBattleMons (now populated).
+      local pm = read_battle_mon(0)
+      if pm.species ~= 0 then
+        player_party_for_plan[1] = pm
+      end
+    end
+
+    local rival_party_for_plan = {}
+    for _, slot in ipairs({1, 3}) do
+      local rm = read_battle_mon(slot)
+      if rm.species ~= 0 then
+        rival_party_for_plan[#rival_party_for_plan + 1] = rm
+      end
+    end
+
+    if #player_party_for_plan > 0 then
+      fire_or_defer_battle_plan(
+        current_battle_id,
+        player_party_for_plan,
+        #rival_party_for_plan > 0 and rival_party_for_plan or nil,
+        state
+      )
+    else
+      write_line("rival-battle-plan skipped: no player party data available")
     end
     return
   end
@@ -890,74 +1048,134 @@ local function check_battle_transitions()
   local current_move = read_current_move()
 
   if current_move ~= 0 then
+    -- Per-side dedup: a single read of `current_move` may persist across many
+    -- frames while the move animation plays, so we suppress duplicates from
+    -- the same battler. Resetting the OTHER side's last_logged on each log
+    -- ensures repeated moves (rival Tackle every turn) still land in the
+    -- log when the fight passes through the alternate side first.
     if is_player_battler(attacker) and current_move ~= last_logged_player_move then
       local mon = read_battle_mon(attacker)
       append_battle_log("player", mon.species, string.format("MOVE_%d", current_move), nil)
       last_logged_player_move = current_move
+      last_logged_rival_move = -1
     elseif is_opponent_battler(attacker) and current_move ~= last_logged_rival_move then
       local mon = read_battle_mon(attacker)
       append_battle_log("rival", mon.species, string.format("MOVE_%d", current_move), nil)
       last_logged_rival_move = current_move
+      last_logged_player_move = -1
       current_turn = current_turn + 1  -- crude turn counter; refine when verified
     end
   end
 end
 
+-- ---------------------------------------------------------------------------
+-- Hours 5-6 trigger detection
+--
+-- Two ONE-SHOT triggers — neither re-arms after firing within a Lua session:
+--   first_capture:  1 → 2 party transition off Oak's Lab, then wait one tile
+--                   of player movement before POSTing /rival-event.
+--   second_capture: 2 → 3 party transition (any map), same 1-tile delay.
+-- ---------------------------------------------------------------------------
+
 local function check_rival_triggers()
-  -- Always read state first so we keep tracking variables fresh, even when
-  -- we won't fire (cooldown / pending / off-scope map).
+  -- Read state every frame so tracking stays current even when we early-out.
   local state = read_game_state()
-  if not state then
-    return
-  end
+  if not state then return end
 
   local map_sig = string.format("%d:%d", state.map_group, state.map_num)
-  local map_label = RIVAL_ACTIVE_MAPS[map_sig]
+  local position_sig = string.format("%d:%d:%d:%d",
+    state.map_group, state.map_num, state.x, state.y)
   local party_count = read_party_count()
 
-  -- Capture previous values before we overwrite tracking state.
   local previous_party_count = last_party_count
+  local previous_position_sig = last_position_signature
   local previous_map_sig = last_map_signature
 
-  -- Detect deltas.
-  local caught_pokemon = (
-    party_count
-    and previous_party_count
-    and party_count > previous_party_count
-  )
-  local entered_new_area = (
-    previous_map_sig
-    and previous_map_sig ~= map_sig
-  )
-
-  -- Update tracking state before any early return — we never want to
-  -- "remember" a stale count and fire on it later.
+  -- Update tracking state up front — we never want a stale value to leak
+  -- into a later frame's delta calculation.
   if party_count then
     last_party_count = party_count
   end
+  last_position_signature = position_sig
   last_map_signature = map_sig
 
-  -- Gate firing on system state.
-  if pending then return end
+  -- Grace window prevents the baseline party read from false-firing on hot
+  -- reload (you typically already have 1 mon when the script attaches).
   if frame_count < RIVAL_GRACE_FRAMES then return end
-  if os.time() - last_rival_event_time < RIVAL_COOLDOWN_SECONDS then return end
-  if not map_label then return end
 
-  -- Priority: a fresh catch wins over a map transition (more interesting event).
-  if caught_pokemon then
+  -- Diagnostic: log every party-size change so we can verify the catch
+  -- detector is observing the 1→2 (and 2→3) transitions live in mGBA.
+  if previous_party_count and party_count and previous_party_count ~= party_count then
+    write_line(string.format(
+      "party-size delta: %d -> %d on map %s (first_capture=%s, second_capture=%s)",
+      previous_party_count, party_count, map_sig,
+      first_capture_state, second_capture_state
+    ))
+  end
+
+  -- ----- first_capture detector ---------------------------------------------
+  if first_capture_state == "idle"
+     and party_count
+     and previous_party_count
+     and previous_party_count == 1
+     and party_count == 2
+     and map_sig ~= OAKS_LAB_MAP_SIG
+  then
+    first_capture_state = "post_catch"
+    first_capture_anchor_position = position_sig
+    write_line(string.format(
+      "first_capture armed: caught at %s — waiting one tile of movement",
+      position_sig
+    ))
+  end
+
+  if first_capture_state == "post_catch"
+     and first_capture_anchor_position
+     and previous_position_sig
+     and position_sig ~= first_capture_anchor_position
+  then
+    -- Player moved one tile after the catch. Fire the cinematic.
+    if pending then
+      -- Don't lose the trigger — leave state armed; we'll retry next frame.
+      return
+    end
+    first_capture_state = "fired"
     local party = read_party_data()
-    local newest = party and party[#party] or nil
-    local details = newest and { species_id = newest.species } or nil
-    fire_rival_event("caught_pokemon", state, party, details)
+    fire_rival_event("first_capture", state, party, {
+      anchor = first_capture_anchor_position,
+    })
     return
   end
 
-  if entered_new_area then
+  -- ----- second_capture detector --------------------------------------------
+  -- Same shape as first_capture but for the 2 → 3 transition (player's
+  -- second wild catch — party total reaches 3). Fires anywhere.
+  if second_capture_state == "idle"
+     and party_count
+     and previous_party_count
+     and previous_party_count == 2
+     and party_count == 3
+  then
+    second_capture_state = "post_catch"
+    second_capture_anchor_position = position_sig
+    write_line(string.format(
+      "second_capture armed: 3rd mon obtained at %s — waiting one tile",
+      position_sig
+    ))
+  end
+
+  if second_capture_state == "post_catch"
+     and second_capture_anchor_position
+     and previous_position_sig
+     and position_sig ~= second_capture_anchor_position
+  then
+    if pending then return end  -- leave armed; retry next frame
+    second_capture_state = "fired"
     local party = read_party_data()
-    fire_rival_event("entered_new_area", state, party, {
-      from_map = previous_map_sig,
-      to_map = map_sig,
+    fire_rival_event("second_capture", state, party, {
+      anchor = second_capture_anchor_position,
     })
+    return
   end
 end
 
@@ -1018,6 +1236,22 @@ local function poll_pending_response()
       end
     elseif pending.label == "rival-event" then
       local message_hex = extract_json_field(response, "message_hex")
+      -- counter_choice is populated for first_capture / second_capture setup
+      -- triggers; absent (or null) for the legacy event types. When present,
+      -- write it to gRivalAIBuffer.counterChoice BEFORE arming the cinematic
+      -- so the rival battle script reads the correct value if the player
+      -- engages immediately.
+      local counter_choice = extract_json_int(response, "counter_choice")
+      if counter_choice then
+        local ok_cc, reason_cc = write_counter_choice_only(counter_choice)
+        if ok_cc then
+          write_line(string.format(
+            "Rival counter_choice=%d written to gRivalAIBuffer", counter_choice
+          ))
+        else
+          write_line("counter_choice write failed: " .. tostring(reason_cc))
+        end
+      end
       local ok, reason = write_hex_to_rival_buffer(message_hex)
       if ok then
         write_line("Rival encounter armed: " .. tostring(reason))
@@ -1027,6 +1261,8 @@ local function poll_pending_response()
     elseif pending.label == "rival-battle-plan" then
       local move_scores = extract_json_int_array(response, "move_scores")
       local counter_choice = extract_json_int(response, "counter_choice")
+      local opening_taunt = extract_json_field(response, "opening_taunt")
+      local strategy_summary = extract_json_field(response, "strategy_summary")
       if move_scores and #move_scores >= 4 then
         local ok, reason = write_rival_ai_plan(move_scores, counter_choice)
         if ok then
@@ -1040,6 +1276,16 @@ local function poll_pending_response()
         end
       else
         write_line("rival-battle-plan: missing or short move_scores in response")
+      end
+      -- Hour 4 (Option B): print Gary's opening taunt to the script panel so
+      -- the judge can see/narrate it. Routing through gRivalEncounterBuffer
+      -- isn't viable mid-battle (the encounter cinematic only fires from a
+      -- map_script_2 frame handler on the overworld, not inside a battle).
+      if opening_taunt and #opening_taunt > 0 then
+        write_line('Gary opening taunt: "' .. opening_taunt .. '"')
+      end
+      if strategy_summary and #strategy_summary > 0 then
+        write_line("Gary strategy: " .. strategy_summary)
       end
     elseif pending.label == "rival-battle-summary" then
       write_line("Battle summary acknowledged by bridge.")
@@ -1102,39 +1348,6 @@ local function poll_codex_mailbox()
   end
 end
 
-local function send_current_state()
-  if pending then
-    return
-  end
-
-  local state, read_error = read_game_state()
-  if not state then
-    write_line(read_error)
-    return
-  end
-
-  local signature = string.format("%d:%d:%d:%d", state.map_group, state.map_num, state.x, state.y)
-  if signature == last_sent_state then
-    return
-  end
-  last_sent_state = signature
-
-  local response, post_error = post_game_state(state)
-  if post_error then
-    write_line(post_error)
-  elseif response and #response > 0 then
-    write_line(string.format(
-      "POST /game-state map=%d:%d pos=(%d,%d) frame=%d",
-      state.map_group,
-      state.map_num,
-      state.x,
-      state.y,
-      state.frame
-    ))
-    write_line(response)
-  end
-end
-
 write_line("PokeLive Codex mailbox bridge loaded.")
 write_line("Start FastAPI first: cd bridge && ./run.sh")
 write_line("Use this with the patched pret/pokefirered ROM, not the runtime textbox-injection demo.")
@@ -1146,9 +1359,8 @@ callbacks:add("frame", function()
   check_rival_triggers()
   if BATTLE_POLLING_ENABLED then
     check_battle_transitions()
-  end
-
-  if frame_count % SEND_EVERY_FRAMES == 0 then
-    send_current_state()
+    -- Hour 4b: if a battle-plan POST got deferred because another request
+    -- was in flight at battle-start time, retry as soon as `pending` clears.
+    flush_deferred_battle_plan()
   end
 end)

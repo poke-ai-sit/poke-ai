@@ -12,6 +12,10 @@ from pokelive_bridge.config import (
 )
 from pokelive_bridge.map_data import map_name, resolve_map_signature
 from pokelive_bridge.pokemon_text import sanitize_dialog_text
+from pokelive_bridge.rival_counter import (
+    battle_index_for_trigger,
+    pick_counter_choice,
+)
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -34,6 +38,8 @@ TriggerType = Literal[
     "won_battle",
     "lost_battle",
     "entered_new_area",
+    "first_capture",
+    "second_capture",
 ]
 
 _TRIGGER_DESCRIPTIONS: dict[str, str] = {
@@ -41,7 +47,23 @@ _TRIGGER_DESCRIPTIONS: dict[str, str] = {
     "won_battle": "The player just won a battle.",
     "lost_battle": "The player just lost a battle.",
     "entered_new_area": "The player just entered a new map.",
+    "first_capture": (
+        "The player just caught their FIRST wild Pokemon "
+        "and walked one tile after the catch. You are about to "
+        "intercept them for the second rival battle."
+    ),
+    "second_capture": (
+        "The player just caught their SECOND wild Pokemon "
+        "(party now has 3 mons total: starter + 2 wild) "
+        "and walked one tile after the catch. You are about to "
+        "intercept them for the third rival battle."
+    ),
 }
+
+# Triggers that are setup events for one of the two scripted rival battles.
+# When fired, the bridge runs the counter-choice picker and includes its
+# decision in the GPT prompt so the rival's opening line can justify it.
+_BATTLE_SETUP_TRIGGERS = {"first_capture", "second_capture"}
 
 
 _client: openai.OpenAI | None = None
@@ -106,6 +128,7 @@ def _build_system_prompt(
     game_state: Any,
     party: list[Any] | None,
     details: dict[str, Any] | None = None,
+    counter_label: str | None = None,
 ) -> str:
     persona = _read_persona()
     memory = _read_recent_memory()
@@ -118,6 +141,18 @@ def _build_system_prompt(
     if details_block:
         situation_lines.append(details_block)
 
+    # If the trigger is a battle setup, the offline picker has already chosen
+    # which counter Gary brings. The line GPT writes should *justify* that
+    # choice ("knew youd lean on Charmander so I packed Squirtle.").
+    counter_block = ""
+    if counter_label:
+        counter_block = (
+            f"\n## Your Counter Pick\n"
+            f"You scouted the player and picked: {counter_label}.\n"
+            f"Your opening line should hint at why this counter fits — "
+            f"reference the matchup naturally without naming the bucket.\n"
+        )
+
     return (
         f"{persona}\n\n"
         f"---\n\n"
@@ -125,7 +160,8 @@ def _build_system_prompt(
         + "\n".join(situation_lines)
         + "\n\n"
         f"## Player's Current Party\n"
-        f"{party_block}\n\n"
+        f"{party_block}\n"
+        f"{counter_block}\n"
         f"## Your Memory of Past Encounters\n"
         f"{memory}\n\n"
         f"## Instructions\n"
@@ -144,9 +180,24 @@ def rival_react(
     game_state: Any,
     party: list[Any] | None = None,
     details: dict[str, Any] | None = None,
-) -> str:
-    """Generate the rival's reaction to a game event and persist it to memory."""
-    system_prompt = _build_system_prompt(trigger, game_state, party, details)
+) -> dict[str, Any]:
+    """Generate the rival's reaction to a game event and persist it to memory.
+
+    Returns a dict with:
+      - message: sanitized dialog string (≤120 chars)
+      - counter_choice: int — picker output for first_capture/second_capture,
+        otherwise None
+      - counter_label: str | None — human-readable bucket name, for memory
+    """
+    counter_choice: int | None = None
+    counter_label: str | None = None
+    if trigger in _BATTLE_SETUP_TRIGGERS:
+        battle_index = battle_index_for_trigger(trigger)
+        counter_choice, counter_label = pick_counter_choice(party, battle_index)
+
+    system_prompt = _build_system_prompt(
+        trigger, game_state, party, details, counter_label=counter_label
+    )
     user_message = trigger if not details else f"{trigger}: {details}"
 
     client = _get_client()
@@ -175,8 +226,15 @@ def rival_react(
         )
         sanitized = sanitized[:_MAX_MESSAGE_CHARS].rstrip()
 
-    _record_memory(trigger, game_state, party, details, sanitized)
-    return sanitized
+    _record_memory(
+        trigger, game_state, party, details, sanitized,
+        counter_choice=counter_choice, counter_label=counter_label,
+    )
+    return {
+        "message": sanitized,
+        "counter_choice": counter_choice,
+        "counter_label": counter_label,
+    }
 
 
 def _format_details_for_memory(details: dict[str, Any] | None) -> str | None:
@@ -197,6 +255,8 @@ def _record_memory(
     party: list[Any] | None,
     details: dict[str, Any] | None,
     rival_message: str,
+    counter_choice: int | None = None,
+    counter_label: str | None = None,
 ) -> None:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
     location = map_name(game_state.map_group, game_state.map_num)
@@ -207,5 +267,19 @@ def _record_memory(
     lines.append(f"Map: {location} ({game_state.map_group}:{game_state.map_num})")
     if party:
         lines.append(f"Player party size: {len(party)}")
+        # On battle-setup triggers also persist what we read from the party so
+        # the next plan_battle call can compare across triggers.
+        if trigger in _BATTLE_SETUP_TRIGGERS:
+            from pokelive_bridge.pokemon_data import species_name
+
+            party_summary = ", ".join(
+                f"{species_name(p.species)} L{p.level}" for p in party
+            )
+            lines.append(f"Player party: {party_summary}")
+    if counter_choice is not None:
+        label = counter_label or "?"
+        lines.append(
+            f"Counter pick: {label} (counterChoice={counter_choice})"
+        )
     lines.append(f"Rival said: {rival_message}")
     _append_memory("\n".join(lines))

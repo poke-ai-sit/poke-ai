@@ -746,12 +746,24 @@
 #define TRAINER_CHAMPION_REMATCH_BULBASAUR       740
 #define TRAINER_CHAMPION_REMATCH_CHARMANDER      741
 #define TRAINER_CUE_BALL_PAXTON                  742
+#define TRAINER_AI_RIVAL_B2_ANTI_FIRE            743
+#define TRAINER_AI_RIVAL_B2_ANTI_WATER           744
+#define TRAINER_AI_RIVAL_B2_ANTI_GRASS           745
+#define TRAINER_AI_RIVAL_B2_ANTI_FLYING          746
+#define TRAINER_AI_RIVAL_B2_ANTI_BUG             747
+#define TRAINER_AI_RIVAL_B2_BALANCED             748
+#define TRAINER_AI_RIVAL_B3_ANTI_FIRE            749
+#define TRAINER_AI_RIVAL_B3_ANTI_WATER           750
+#define TRAINER_AI_RIVAL_B3_ANTI_GRASS           751
+#define TRAINER_AI_RIVAL_B3_ANTI_FLYING          752
+#define TRAINER_AI_RIVAL_B3_ANTI_BUG             753
+#define TRAINER_AI_RIVAL_B3_BALANCED             754
 
-// NOTE: Because each Trainer uses a flag to determine when they are defeated, there is 
+// NOTE: Because each Trainer uses a flag to determine when they are defeated, there is
 //       only space for 25 additional trainers before trainer flag space overflows.
 //       MAX_TRAINERS_COUNT can be increased but will take up additional saveblock space
 
-#define NUM_TRAINERS                             743
+#define NUM_TRAINERS                             755
 #define MAX_TRAINERS_COUNT                       768
 
 #endif  // GUARD_CONSTANTS_OPPONENTS_H
