@@ -71,6 +71,8 @@ class RivalEventRequest(BaseModel):
         "won_battle",
         "lost_battle",
         "entered_new_area",
+        "first_capture",
+        "pewter_step",
     ]
     game_state: GameStateRequest
     party: list[PartyEntryRequest] | None = None
@@ -83,6 +85,11 @@ class RivalEventResponse(BaseModel):
     message_hex: str
     action: Literal["approach", "idle"]
     game_state: GameStateRequest
+    # Populated only for battle-setup triggers (first_capture / pewter_step).
+    # Lua writes this byte to gRivalAIBuffer.counterChoice so the C-side
+    # battle script picks the right rival lead.
+    counter_choice: int | None = None
+    counter_label: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -216,12 +223,13 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
 
     latest_game_state = event.game_state
 
-    message = rival_react(
+    result = rival_react(
         trigger=event.trigger,
         game_state=event.game_state,
         party=event.party,
         details=event.details,
     )
+    message = result["message"]
 
     return RivalEventResponse(
         speaker="Gary",
@@ -229,6 +237,8 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         message_hex=format_dialog_hex(message, chars_per_line=200, lines_per_page=1),
         action="approach",
         game_state=event.game_state,
+        counter_choice=result.get("counter_choice"),
+        counter_label=result.get("counter_label"),
     )
 
 
