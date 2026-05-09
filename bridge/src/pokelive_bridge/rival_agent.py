@@ -330,6 +330,7 @@ def rival_react(
     counter_label: str | None = None
     call_pages: list[str] | None = None
     party_override: list[dict[str, Any]] | None = None
+    party_reasoning: list[str] | None = None
 
     if trigger in _BATTLE_SETUP_TRIGGERS:
         battle_index = battle_index_for_trigger(trigger)
@@ -340,9 +341,9 @@ def rival_react(
         # gEnemyParty at battle setup. The legacy counter_choice index above
         # still routes the script to *some* base trainer, but its static
         # party gets overwritten before the first turn.
-        party_override = [
-            slot.to_dict() for slot in pick_rival_party(party, battle_index)
-        ]
+        rival_slots = pick_rival_party(party, battle_index)
+        party_override = [slot.to_dict() for slot in rival_slots]
+        party_reasoning = [slot.reason for slot in rival_slots]
         sanitized, call_pages = _generate_pokegear_response(
             trigger, game_state, party, details, counter_label, rival_name,
         )
@@ -391,6 +392,7 @@ def rival_react(
         "counter_choice": counter_choice,
         "counter_label": counter_label,
         "party_override": party_override,
+        "party_reasoning": party_reasoning,
     }
 
 

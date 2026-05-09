@@ -104,6 +104,10 @@ class RivalEventResponse(BaseModel):
     # dispatched base trainer's static party held. None for non-battle
     # triggers.
     party_override: list[dict[str, Any]] | None = None
+    # Per-slot reasoning string explaining the counter pick. Echoed to the
+    # mGBA script console by Lua so the audience sees the type-chart logic
+    # the picker followed live.
+    party_reasoning: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +289,7 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         call_pages=call_pages,
         call_pages_hex=call_pages_hex,
         party_override=result.get("party_override"),
+        party_reasoning=result.get("party_reasoning"),
     )
 
 

@@ -897,6 +897,21 @@ local function fire_rival_event(trigger, state, party, details)
     "RIVAL EVENT trigger=%s map=%d:%d pos=(%d,%d)",
     trigger, state.map_group, state.map_num, state.x, state.y
   ))
+  -- Dump the player party we are about to ship to the bridge so the
+  -- picker's input is auditable from the script console — when the rival
+  -- shows up with the wrong counter, it's almost always because this
+  -- party is stale or empty.
+  if party and #party > 0 then
+    local parts = {}
+    for i, e in ipairs(party) do
+      parts[#parts + 1] = string.format(
+        "[%d]sp=%d lv=%d", i, e.species or 0, e.level or 0
+      )
+    end
+    write_line("player party sent: " .. table.concat(parts, " "))
+  else
+    write_line("player party sent: <empty> (gPokelivePartyData not refreshed)")
+  end
   -- Remember which trigger fired so the battle-entry watcher can tag the
   -- log with the right battle_id when the cinematic transitions to combat.
   last_rival_trigger = trigger
@@ -1645,6 +1660,16 @@ local function poll_pending_response()
         -- No override in response — make sure stale data from a previous
         -- encounter doesn't leak into the next battle.
         write_party_override(nil)
+      end
+      -- Echo the picker's per-slot reasoning so the audience sees the
+      -- type-chart logic the bridge used. One line per slot, prefixed with
+      -- the rival name so multi-encounter demos read cleanly.
+      local reasoning = extract_json_string_array(response, "party_reasoning")
+      if reasoning then
+        local rname = read_rival_name() or "Rival"
+        for _, line in ipairs(reasoning) do
+          write_line(string.format("%s reasoning: %s", rname, line))
+        end
       end
       -- Pokegear-style call pages — populated only for first_capture and
       -- second_capture triggers. Each page goes into its own EWRAM slot in
