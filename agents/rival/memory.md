@@ -14,37 +14,70 @@ Each entry is a markdown section with a UTC timestamp header followed by structu
 
 ## Log
 
-## 2026-05-09T07:31
-Trigger: first_capture
-Details: anchor=3:19:6:32, tiles=2
-Map: Route 1 (3:19)
-Player party size: 2
-Player party: PRATA L100, PIDGEY L3
-Counter pick: B2 rival-Squirt + anti-Flying (counterChoice=3)
-Call page 1: RING RING... You got a Pokegear alert.
-Call page 2: Its GEMINI. Your rival is on the line.
-Call page 3: Prepare yourself. GEMINI is coming.
-Rival said: A Pidgey. Cute. I caught a Mankey.
-
-## 2026-05-09T07:31 — Battle 2 — after first capture (PLAN)
+## 2026-05-09T07:38 — Battle 1 — Oak's Lab (PLAN)
 Counter choice: party slot 0
-Move score boosts: [-20, -20, -20, -20]
-Reasoning: Player leads with PRATA (Fire type), level 100 → I have a Pidgey, level 3, without type advantage → Attempt to use TACKLE can be ineffective → Opening taunt should note player's current Fire type
-Strategy: The player's PRATA at level 100 heavily outlevels my Pidgey at level 3. Pidgey lacks moves to overcome PRATA's strength, so the strategy focuses on acknowledging PRATA's formidable presence while aiming to build future encounters more strategically.
+Move score boosts: [0, 10, -20, -20]
+Reasoning: Player party: Bulbasaur, Grass type → My party: Prata, Normal type → Bulbasaur resists Normal moves → Focus on weakening Bulbasaur with Growl
+Strategy: The player has a high-level Bulbasaur, which resists Normal-type moves. I will lead with Prata and use Growl to weaken Bulbasaur's Attack, even though direct damage will be ineffective. By using Growl, I aim to mitigate the damage dealt to my team and prolong the battle, looking for any strategic opening.
 
-## 2026-05-09T07:32 — Battle 2 — after first capture (RESULT)
+## 2026-05-09T07:39 — Battle 1 — Oak's Lab (RESULT)
 Outcome (rival): LOST
 Outcome (player): WON
-Turns: 9
+Turns: 10
 Move log:
-  T1 RIVAL PRATA PRO used MOVE_25
-  T2 RIVAL PRATA PRO used MOVE_145
-  T3 RIVAL PRATA PRO used MOVE_25
-  T4 PLAYER PRATA used MOVE_53
-  T4 RIVAL VENUSAUR used MOVE_98
-  T5 PLAYER PRATA used MOVE_53
-  T5 RIVAL VENUSAUR used MOVE_86
-  T6 RIVAL VENUSAUR used MOVE_98
-  T7 PLAYER PRATA used MOVE_53
-Summary: Lost to PRATA. My VENUSAUR couldn't withstand its attacks. PRATA's MOVE_53 dealt consistent damage, overpowering my team.
-Lessons: Player favors PRATA and its strong offensive moves. Next time, I'll prepare a counter with high defense against Fire type moves.
+  T1 RIVAL PRATA used MOVE_10
+  T2 PLAYER BULBASAUR used MOVE_230
+  T2 RIVAL PRATA used MOVE_10
+  T3 PLAYER BULBASAUR used MOVE_230
+  T3 RIVAL PRATA used MOVE_10
+  T4 PLAYER BULBASAUR used MOVE_230
+  T4 RIVAL PRATA used MOVE_10
+  T5 PLAYER BULBASAUR used MOVE_76
+  T5 RIVAL PRATA used MOVE_10
+  T6 PLAYER BULBASAUR used MOVE_76
+Summary: In Battle 1 at Oak's Lab, my PRATA faced the player's BULBASAUR and lost despite attempts to weaken it with Growl. BULBASAUR's advantage in resisting Normal moves proved decisive.
+Lessons: Player favors BULBASAUR's type advantage. I should select a Pokémon with strong counter moves against Grass, like a Fire or Flying type, in future battles.
+
+## 2026-05-09T07:39
+Trigger: first_capture
+Details: tiles=2, anchor=3:19:21:32
+Map: Route 1 (3:19)
+Player party size: 2
+Player party: BULBASAUR L100, RATTATA L3
+Counter pick: B2 rival-Char + anti-Normal (counterChoice=1)
+Call page 1: Your Pokegear buzzes insistently.
+Call page 2: Its GEMINI. Youre right behind me.
+Call page 3: Caught a Rattata. Charming. On my way.
+Rival said: Rattata. Ready for Char now.
+
+## 2026-05-09T07:39 — Battle 2 — after first capture (PLAN)
+Counter choice: party slot 0
+Move score boosts: [10, -20, 10, -20]
+Reasoning: Player leads Bulbasaur (Grass type) → Bulbasaur resists my Normal moves → Need to suppress Bulbasaur's Special Attack → Rattata lacks counter. Tail Whip to lower DEF.
+Strategy: I will lead with my Rattata and use Tackle. Bulbasaur's resistance to Normal type moves means damage won't be as effective as I'd like, but I'll focus on trying to weaken its defenses.
+
+## 2026-05-09T07:40 — Battle 2 — after first capture (RESULT)
+Outcome (rival): LOST
+Outcome (player): WON
+Turns: 18
+Move log:
+  T1 RIVAL PRATA PRO used MOVE_52
+  T2 RIVAL PRATA PRO used MOVE_66
+  T3 PLAYER BULBASAUR used MOVE_76
+  T3 RIVAL PRATA PRO used MOVE_43
+  T4 RIVAL PRATA PRO used MOVE_66
+  T5 RIVAL PRATA PRO used MOVE_52
+  T6 RIVAL PRATA PRO used MOVE_66
+  T7 PLAYER BULBASAUR used MOVE_76
+  T7 RIVAL PRATA PRO used MOVE_2
+  T8 RIVAL PRATA PRO used MOVE_43
+  T9 PLAYER BULBASAUR used MOVE_76
+  T9 RIVAL PRATA PRO used MOVE_2
+  T10 RIVAL PRATA PRO used MOVE_43
+  T11 PLAYER BULBASAUR used MOVE_76
+  T11 RIVAL PRATA PRO used MOVE_2
+  T12 PLAYER BULBASAUR used MOVE_76
+  T12 RIVAL PRATA PRO used MOVE_2
+  T13 PLAYER BULBASAUR used MOVE_76
+Summary: In Battle 2, my PRATA PRO faced the player's BULBASAUR and lost again. BULBASAUR's resistance to my PRATA PRO's Normal-type moves ensured its victory.
+Lessons: The player consistently relies on BULBASAUR. Next, I'll choose a Fire-type to exploit BULBASAUR's Grass weakness.
