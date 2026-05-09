@@ -14,6 +14,7 @@ Route2_OnFrame::
 @ PokeLive Smart Gary AI Rival — Battle 2 cinematic on Route 2.
 Route2_EventScript_AIRivalEncounter::
 	lockall
+	call EventScript_AIRivalPhoneCall
 	getplayerxy VAR_0x8004, VAR_0x8005
 	addvar VAR_0x8004, 2
 	setobjectxyperm LOCALID_ROUTE2_AI_RIVAL, VAR_0x8004, VAR_0x8005

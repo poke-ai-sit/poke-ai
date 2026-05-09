@@ -88,6 +88,11 @@ local RIVAL_ENCOUNTER_MESSAGE_MAX    = 200
 local RIVAL_ENCOUNTER_OFFSET_STATUS  = 4
 local RIVAL_ENCOUNTER_OFFSET_LENGTH  = 5
 local RIVAL_ENCOUNTER_OFFSET_MESSAGE = 8
+-- Pokegear-style call-page array follows message[200] in the C struct.
+-- Offset 208 = 8 (header) + 200 (message). 3 pages × 50 bytes each = 150.
+local RIVAL_ENCOUNTER_OFFSET_CALL_PAGES = 208
+local RIVAL_ENCOUNTER_CALL_PAGE_LENGTH = 50
+local RIVAL_ENCOUNTER_CALL_PAGES_COUNT = 3
 
 -- VAR_TEMP_0 lives at SaveBlock1 + 0x1000 (vars[0], u16). The map_script_2
 -- frame script triggers when VAR_TEMP_0 == 1; the encounter script resets
@@ -425,6 +430,20 @@ local function extract_json_int(response, field_name)
   return nil
 end
 
+-- Extracts a JSON string array (e.g. "call_pages_hex":["aa","bb","cc"]).
+-- Returns a Lua table of strings, or nil if the field is absent or malformed.
+local function extract_json_string_array(response, field_name)
+  local pattern = '"' .. field_name .. '"%s*:%s*%[(.-)%]'
+  local body = response:match(pattern)
+  if not body then return nil end
+  local out = {}
+  -- Match each "..." string element. json_unescape unwinds \" \\ \n \r.
+  for raw in body:gmatch('"(.-)"') do
+    out[#out + 1] = json_unescape(raw)
+  end
+  return out
+end
+
 -- gRivalAIBuffer layout (matches struct in include/pokelive_rival_ai.h):
 --   off 0..3  : u32 magic
 --   off 4     : u8  active        (1 = plan loaded; C hook clears to 0 after first turn)
@@ -672,6 +691,44 @@ local function post_rival_memory_reset()
     "rival-memory-reset",
     nil
   )
+end
+
+-- Writes a hex-encoded string into one of the three callPages slots in
+-- gRivalEncounterBuffer. page_idx is 0..2. Truncates at the slot length and
+-- always terminates with 0xFF. Returns (ok, reason).
+local function write_hex_to_call_page(page_idx, hex_text)
+  if page_idx < 0 or page_idx >= RIVAL_ENCOUNTER_CALL_PAGES_COUNT then
+    return false, "call page index out of range"
+  end
+  if not hex_text or #hex_text < 2 or #hex_text % 2 ~= 0 or hex_text:match("[^0-9A-Fa-f]") then
+    return false, "invalid call_page_hex"
+  end
+
+  local base = RIVAL_ENCOUNTER_BUFFER_ADDR
+  local page_addr = base + RIVAL_ENCOUNTER_OFFSET_CALL_PAGES
+                       + page_idx * RIVAL_ENCOUNTER_CALL_PAGE_LENGTH
+  local max_bytes = RIVAL_ENCOUNTER_CALL_PAGE_LENGTH - 1  -- reserve EOS slot
+  local byte_count = math.min(#hex_text / 2, max_bytes)
+  local wrote_eos = false
+
+  emu:write32(base, RIVAL_ENCOUNTER_MAGIC)
+
+  for i = 1, byte_count do
+    local hex_index = i * 2 - 1
+    local value = tonumber(hex_text:sub(hex_index, hex_index + 1), 16)
+    emu:write8(page_addr + i - 1, value)
+    if value == 0xFF then
+      wrote_eos = true
+      byte_count = i
+      break
+    end
+  end
+
+  if not wrote_eos then
+    emu:write8(page_addr + byte_count, 0xFF)
+  end
+
+  return true
 end
 
 local function write_hex_to_rival_buffer(hex_text)
@@ -1364,6 +1421,29 @@ local function poll_pending_response()
         else
           write_line("counter_choice write failed: " .. tostring(reason_cc))
         end
+      end
+      -- Pokegear-style call pages — populated only for first_capture and
+      -- second_capture triggers. Each page goes into its own EWRAM slot in
+      -- gRivalEncounterBuffer.callPages so the ROM cinematic script can msgbox
+      -- them in sequence (BufferRivalCallNextPage cycles through them via
+      -- gStringVar1). Must land BEFORE write_hex_to_rival_buffer flips status,
+      -- otherwise the frame script could fire on stale call pages.
+      local call_pages_hex = extract_json_string_array(response, "call_pages_hex")
+      if call_pages_hex then
+        for i, page_hex in ipairs(call_pages_hex) do
+          if i <= RIVAL_ENCOUNTER_CALL_PAGES_COUNT then
+            local ok_cp, reason_cp = write_hex_to_call_page(i - 1, page_hex)
+            if not ok_cp then
+              write_line(string.format(
+                "call page %d write failed: %s", i, tostring(reason_cp)
+              ))
+            end
+          end
+        end
+        write_line(string.format(
+          "%d Pokegear call pages written to gRivalEncounterBuffer",
+          math.min(#call_pages_hex, RIVAL_ENCOUNTER_CALL_PAGES_COUNT)
+        ))
       end
       local ok, reason = write_hex_to_rival_buffer(message_hex)
       if ok then

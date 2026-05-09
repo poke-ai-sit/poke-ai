@@ -16,6 +16,23 @@ EventScript_AIRivalEncounterCinematic::
 	call EventScript_AIRivalDispatchTrainerBattle
 	return
 
+@ Hours 5-6 — Pokegear-style call narration that runs BEFORE the rival
+@ warps in. Cycles three short pages through gStringVar1 (one msgbox label
+@ reused, since gStringVar2/3 are only 20 bytes). Each page is its own
+@ click-to-advance textbox. Lua writes the three page strings into
+@ gRivalEncounterBuffer.callPages[0..2] alongside the in-person message
+@ when the /rival-event response comes back.
+EventScript_AIRivalPhoneCall::
+	playse SE_PC_LOGIN
+	special ResetRivalCallPageIndex
+	special BufferRivalCallNextPage
+	msgbox PokeLive_Text_AIRivalProactive, MSGBOX_DEFAULT
+	special BufferRivalCallNextPage
+	msgbox PokeLive_Text_AIRivalProactive, MSGBOX_DEFAULT
+	special BufferRivalCallNextPage
+	msgbox PokeLive_Text_AIRivalProactive, MSGBOX_DEFAULT
+	return
+
 @ Reads gRivalAIBuffer.counterChoice → VAR_RESULT (0..11) and runs the
 @ matching trainer battle. Falls through to balanced variants on any
 @ unexpected value so the cinematic never hangs.

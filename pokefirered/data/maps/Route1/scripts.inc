@@ -20,6 +20,7 @@ Route1_OnFrame::
 @ Lua-selected counter team.
 Route1_EventScript_AIRivalEncounter::
 	lockall
+	call EventScript_AIRivalPhoneCall
 	getplayerxy VAR_0x8004, VAR_0x8005
 	addvar VAR_0x8004, 2
 	setobjectxyperm LOCALID_ROUTE1_AI_RIVAL, VAR_0x8004, VAR_0x8005

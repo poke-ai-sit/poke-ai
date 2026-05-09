@@ -91,6 +91,12 @@ class RivalEventResponse(BaseModel):
     # battle script picks the right rival lead.
     counter_choice: int | None = None
     counter_label: str | None = None
+    # Pokegear-style narration shown BEFORE the rival warps in. Three short
+    # textboxes the player advances with A. Lua decodes each hex blob into
+    # gRivalEncounterBuffer.callPages[i] so the ROM script can msgbox them
+    # via BufferRivalCallNextPage. None for non-battle-setup triggers.
+    call_pages: list[str] | None = None
+    call_pages_hex: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -253,6 +259,13 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         rival_name=event.rival_name,
     )
     message = result["message"]
+    call_pages = result.get("call_pages")
+    call_pages_hex: list[str] | None = None
+    if call_pages:
+        call_pages_hex = [
+            format_dialog_hex(p, chars_per_line=200, lines_per_page=1)
+            for p in call_pages
+        ]
 
     return RivalEventResponse(
         speaker=event.rival_name or "Rival",
@@ -262,6 +275,8 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         game_state=event.game_state,
         counter_choice=result.get("counter_choice"),
         counter_label=result.get("counter_label"),
+        call_pages=call_pages,
+        call_pages_hex=call_pages_hex,
     )
 
 

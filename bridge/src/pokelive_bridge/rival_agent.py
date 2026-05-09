@@ -208,6 +208,107 @@ def _build_system_prompt(
     )
 
 
+# Hard cap per call-page byte length matches the C struct
+# (RIVAL_ENCOUNTER_CALL_PAGE_LENGTH = 50). FireRed encoding is 1 byte per
+# ASCII char + 1 byte EOS, so cap at 45 chars to leave headroom.
+_CALL_PAGE_MAX_CHARS = 45
+
+_FALLBACK_CALL_PAGES = [
+    "Your Pokegear is ringing.",
+    "Its your rival.",
+    "Theyre coming for you.",
+]
+
+
+def _generate_pokegear_response(
+    trigger: str,
+    game_state: Any,
+    party: list[Any] | None,
+    details: dict[str, Any] | None,
+    counter_label: str | None,
+    rival_name: str | None,
+) -> tuple[str, list[str]]:
+    """JSON-mode GPT call producing both the in-person line AND 3 phone-call
+    pages for the Pokegear-style cinematic that runs before the rival warps in.
+
+    Returns (in_person_line, [call_page_1, call_page_2, call_page_3]).
+    Each string is sanitized + truncated to fit FireRed's textbox.
+    """
+    persona = _read_persona(rival_name)
+    memory = _read_recent_memory()
+    party_block = _format_party_block(party)
+    location = map_name(game_state.map_group, game_state.map_num)
+    counter_block = (
+        f"\nYour scouted counter pick: {counter_label}.\n"
+        if counter_label else ""
+    )
+
+    system_prompt = (
+        f"{persona}\n\n"
+        f"---\n"
+        f"## Pokegear Call + Approach Cinematic\n"
+        f"Trigger: {trigger}\n"
+        f"Player location: {location}\n"
+        f"Player party: {party_block}\n"
+        f"{counter_block}"
+        f"\n## Your Memory of Past Encounters\n"
+        f"{memory}\n\n"
+        f"## Output\n"
+        f"You must output ONE JSON object with exactly these keys:\n"
+        f"  call_pages: array of EXACTLY 3 strings — short Pokegear-style\n"
+        f"              narration the player reads BEFORE you appear.\n"
+        f"              Each ≤ 45 ASCII chars. Letters numbers spaces and\n"
+        f"              periods only. No exclamation or question marks.\n"
+        f"              First page sets the scene (phone ringing or buzzing),\n"
+        f"              second page reveals it is you, third page asserts\n"
+        f"              you are coming for them. Stay in character.\n"
+        f"  in_person_line: string ≤ 45 chars — what you say face-to-face\n"
+        f"                  when the player meets you in person, after the\n"
+        f"                  call ends. Reference the LIVE player party only.\n"
+        f"Do not include other keys. Do not wrap in markdown.\n"
+    )
+
+    client = _get_client()
+    raw: dict[str, Any]
+    try:
+        import json
+        response = client.chat.completions.create(
+            model=OPENAI_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Generate the {trigger} cinematic."},
+            ],
+            response_format={"type": "json_object"},
+            max_completion_tokens=OPENAI_MAX_COMPLETION_TOKENS,
+        )
+        content = response.choices[0].message.content or "{}"
+        raw = json.loads(content)
+    except Exception as e:
+        logging.exception("Pokegear GPT call failed: %s", e)
+        raw = {}
+
+    in_person = sanitize_dialog_text(
+        str(raw.get("in_person_line", FALLBACK_MESSAGE))
+    )[:_CALL_PAGE_MAX_CHARS].rstrip()
+    if not in_person:
+        in_person = FALLBACK_MESSAGE[:_CALL_PAGE_MAX_CHARS]
+
+    raw_pages = raw.get("call_pages", [])
+    if not isinstance(raw_pages, list):
+        raw_pages = []
+    call_pages: list[str] = []
+    for i in range(3):
+        if i < len(raw_pages):
+            page = sanitize_dialog_text(str(raw_pages[i]))[:_CALL_PAGE_MAX_CHARS].rstrip()
+        else:
+            page = ""
+        if not page:
+            page = _FALLBACK_CALL_PAGES[i]
+        call_pages.append(page)
+
+    return in_person, call_pages
+
+
 def rival_react(
     trigger: str,
     game_state: Any,
@@ -218,55 +319,64 @@ def rival_react(
     """Generate the rival's reaction to a game event and persist it to memory.
 
     Returns a dict with:
-      - message: sanitized dialog string (≤120 chars)
-      - counter_choice: int — picker output for first_capture/second_capture,
-        otherwise None
+      - message: sanitized dialog string (≤120 chars) — the in-person line
+      - call_pages: list[str] | None — 3 Pokegear narration pages for
+        battle-setup triggers (first_capture / second_capture); None otherwise
+      - counter_choice: int — picker output for battle-setup triggers
       - counter_label: str | None — human-readable bucket name, for memory
     """
     counter_choice: int | None = None
     counter_label: str | None = None
+    call_pages: list[str] | None = None
+
     if trigger in _BATTLE_SETUP_TRIGGERS:
         battle_index = battle_index_for_trigger(trigger)
         counter_choice, counter_label = pick_counter_choice(party, battle_index)
-
-    system_prompt = _build_system_prompt(
-        trigger, game_state, party, details,
-        counter_label=counter_label, rival_name=rival_name,
-    )
-    user_message = trigger if not details else f"{trigger}: {details}"
-
-    client = _get_client()
-    raw_message: str
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_CHAT_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            max_completion_tokens=OPENAI_MAX_COMPLETION_TOKENS,
+        sanitized, call_pages = _generate_pokegear_response(
+            trigger, game_state, party, details, counter_label, rival_name,
         )
-        content = response.choices[0].message.content
-        raw_message = content.strip() if content else FALLBACK_MESSAGE
-    except Exception as e:
-        logging.exception("Rival GPT call failed: %s", e)
-        raw_message = FALLBACK_MESSAGE
-
-    sanitized = sanitize_dialog_text(raw_message)
-    if len(sanitized) > _MAX_MESSAGE_CHARS:
-        logging.warning(
-            "Rival message exceeded %d chars (%d). Truncating.",
-            _MAX_MESSAGE_CHARS,
-            len(sanitized),
+    else:
+        # Non-battle-setup triggers keep the legacy single-line flow.
+        system_prompt = _build_system_prompt(
+            trigger, game_state, party, details,
+            counter_label=counter_label, rival_name=rival_name,
         )
-        sanitized = sanitized[:_MAX_MESSAGE_CHARS].rstrip()
+        user_message = trigger if not details else f"{trigger}: {details}"
+
+        client = _get_client()
+        raw_message: str
+        try:
+            response = client.chat.completions.create(
+                model=OPENAI_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                max_completion_tokens=OPENAI_MAX_COMPLETION_TOKENS,
+            )
+            content = response.choices[0].message.content
+            raw_message = content.strip() if content else FALLBACK_MESSAGE
+        except Exception as e:
+            logging.exception("Rival GPT call failed: %s", e)
+            raw_message = FALLBACK_MESSAGE
+
+        sanitized = sanitize_dialog_text(raw_message)
+        if len(sanitized) > _MAX_MESSAGE_CHARS:
+            logging.warning(
+                "Rival message exceeded %d chars (%d). Truncating.",
+                _MAX_MESSAGE_CHARS,
+                len(sanitized),
+            )
+            sanitized = sanitized[:_MAX_MESSAGE_CHARS].rstrip()
 
     _record_memory(
         trigger, game_state, party, details, sanitized,
         counter_choice=counter_choice, counter_label=counter_label,
+        call_pages=call_pages,
     )
     return {
         "message": sanitized,
+        "call_pages": call_pages,
         "counter_choice": counter_choice,
         "counter_label": counter_label,
     }
@@ -292,6 +402,7 @@ def _record_memory(
     rival_message: str,
     counter_choice: int | None = None,
     counter_label: str | None = None,
+    call_pages: list[str] | None = None,
 ) -> None:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
     location = map_name(game_state.map_group, game_state.map_num)
@@ -316,5 +427,8 @@ def _record_memory(
         lines.append(
             f"Counter pick: {label} (counterChoice={counter_choice})"
         )
+    if call_pages:
+        for i, page in enumerate(call_pages, start=1):
+            lines.append(f"Call page {i}: {page}")
     lines.append(f"Rival said: {rival_message}")
     _append_memory("\n".join(lines))

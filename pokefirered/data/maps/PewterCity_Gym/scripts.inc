@@ -18,6 +18,7 @@ PewterCity_Gym_OnFrame::
 @ Brock is untouched — the player continues to the gym leader normally.
 PewterCity_Gym_EventScript_AIRivalEncounter::
 	lockall
+	call EventScript_AIRivalPhoneCall
 	getplayerxy VAR_0x8004, VAR_0x8005
 	addvar VAR_0x8005, 2
 	setobjectxyperm LOCALID_PEWTER_GYM_AI_RIVAL, VAR_0x8004, VAR_0x8005

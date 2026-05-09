@@ -462,4 +462,6 @@ gSpecials::
 	def_special BufferRivalMessage
 	def_special CreateEnemyEventMon
 	def_special GetAIRivalCounterChoice
+	def_special ResetRivalCallPageIndex
+	def_special BufferRivalCallNextPage
 gSpecialsEnd::

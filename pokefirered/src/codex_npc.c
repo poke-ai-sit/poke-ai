@@ -46,6 +46,8 @@ struct PokeliveCodexMailbox
  */
 #define POKELIVE_RIVAL_ENCOUNTER_MAGIC 0x52454E43  /* "RENC" */
 #define RIVAL_ENCOUNTER_MESSAGE_LENGTH 200
+#define RIVAL_ENCOUNTER_CALL_PAGE_LENGTH 50
+#define RIVAL_ENCOUNTER_CALL_PAGES 3
 
 enum
 {
@@ -60,6 +62,12 @@ struct PokeliveRivalEncounter
     u8  messageLength;
     u8  pad[2];
     u8  message[RIVAL_ENCOUNTER_MESSAGE_LENGTH];
+    /* Hours 5-6 Pokegear-call cinematic: three short narration pages that
+     * play before the rival actually appears. Lua writes each page when the
+     * /rival-event response comes back (only for first_capture and
+     * second_capture triggers). The C-side BufferRivalCallNextPage ladder
+     * cycles them through gStringVar1 so the script can msgbox each. */
+    u8  callPages[RIVAL_ENCOUNTER_CALL_PAGES][RIVAL_ENCOUNTER_CALL_PAGE_LENGTH];
 };
 
 struct PokelivePartyEntry
@@ -260,6 +268,36 @@ void BufferRivalMessage(void)
     else
         StringCopy(gStringVar1, gRivalEncounterBuffer.message);
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
+}
+
+/* Pokegear-style multi-page call dialogue (Hours 5-6). The script does:
+ *   special ResetRivalCallPageIndex
+ *   special BufferRivalCallNextPage  ; advances index, copies into gStringVar1
+ *   msgbox "{STR_VAR_1}$"            ; player clicks A
+ *   special BufferRivalCallNextPage
+ *   msgbox "{STR_VAR_1}$"
+ *   ... etc.
+ * Cycling through gStringVar1 lets us reuse one msgbox label across all
+ * three pages without needing gStringVar2/3 (which are only 20 bytes). */
+static u8 sRivalCallPageIndex = 0;
+
+void ResetRivalCallPageIndex(void)
+{
+    sRivalCallPageIndex = 0;
+}
+
+void BufferRivalCallNextPage(void)
+{
+    u8 idx;
+    EnsureRivalEncounterInitialized();
+    idx = sRivalCallPageIndex;
+    if (idx >= RIVAL_ENCOUNTER_CALL_PAGES)
+        idx = RIVAL_ENCOUNTER_CALL_PAGES - 1;
+    if (gRivalEncounterBuffer.callPages[idx][0] == EOS)
+        gStringVar1[0] = EOS;
+    else
+        StringCopy(gStringVar1, gRivalEncounterBuffer.callPages[idx]);
+    sRivalCallPageIndex++;
 }
 
 /* Smart Gary AI Rival — counterChoice → trainer-id dispatcher.
