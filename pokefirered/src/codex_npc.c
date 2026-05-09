@@ -270,6 +270,7 @@ void BufferRivalMessage(void)
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
 }
 
+<<<<<<< HEAD
 /* Pokegear-style multi-page call dialogue (Hours 5-6). The script does:
  *   special ResetRivalCallPageIndex
  *   special BufferRivalCallNextPage  ; advances index, copies into gStringVar1
@@ -319,4 +320,25 @@ void BufferRivalCallNextPage(void)
 void GetAIRivalCounterChoice(void)
 {
     gSpecialVar_Result = gRivalAIBuffer.counterChoice;
+=======
+void EvolveCustomPokemon(void)
+{
+    u16 species;
+    u16 newSpecies;
+    int i;
+
+    for (i = 0; i < gPlayerPartyCount; i++)
+    {
+        species = GetMonData(&gPlayerParty[i], MON_DATA_SPECIES, NULL);
+        if (species == SPECIES_CHARMANDER)
+        {
+            newSpecies = SPECIES_CHARMELEON;
+            SetMonData(&gPlayerParty[i], MON_DATA_SPECIES, &newSpecies);
+            CalculateMonStats(&gPlayerParty[i]);
+            gSpecialVar_Result = TRUE;
+            return;
+        }
+    }
+    gSpecialVar_Result = FALSE;
+>>>>>>> feat/004-AI-Pokémon-Creator
 }
