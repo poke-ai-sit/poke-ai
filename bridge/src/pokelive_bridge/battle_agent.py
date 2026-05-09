@@ -111,6 +111,7 @@ def plan_battle(
     player_party: list[Any],
     rival_party: list[Any] | None = None,
     game_state: Any = None,
+    rival_name: str | None = None,
 ) -> dict[str, Any]:
     """Pre-battle: pick a counter, output move-score boosts, write opening line.
 
@@ -122,11 +123,11 @@ def plan_battle(
         "strategy_summary": str,       # written into memory afterwards
       }
     """
-    persona = _read_persona()
+    persona = _read_persona(rival_name)
     memory = _read_recent_memory()
     label = BATTLE_ID_LABELS.get(battle_id, battle_id)
-    player_block = _format_party(player_party, "Player party")
-    rival_block = _format_party(rival_party, "Your (Gary's) party")
+    player_block = _format_party(player_party, "Player party (CURRENT, ground truth)")
+    rival_block = _format_party(rival_party, "Your party (CURRENT, ground truth)")
     location = ""
     if game_state is not None:
         from pokelive_bridge.map_data import map_name
@@ -143,6 +144,12 @@ def plan_battle(
         f"{rival_block}\n\n"
         f"## Your Memory of Past Encounters\n"
         f"{memory}\n\n"
+        f"## CRITICAL — Ground Truth Anchoring\n"
+        f"The Player party and Your party blocks above are the LIVE state.\n"
+        f"If memory mentions different species (e.g. an old battle where the\n"
+        f"player had Charmander), trust the LIVE state, not memory.\n"
+        f"NEVER invert the parties — the rival's species is in 'Your party',\n"
+        f"the player's is in 'Player party'.\n\n"
         f"## Output\n"
         f"You must output ONE JSON object with exactly these keys:\n"
         f"  counter_choice: integer 0-2 — which of your party slots leads.\n"
@@ -151,9 +158,9 @@ def plan_battle(
         f"               Higher = more likely to use. Use -20 to suppress.\n"
         f"  opening_taunt: string under 120 characters, ASCII letters numbers\n"
         f"                 spaces and periods only, no exclamation or question\n"
-        f"                 marks, in character as Gary, said when battle starts.\n"
+        f"                 marks, in character, said when battle starts.\n"
         f"  strategy_summary: string under 300 chars summarizing your plan and\n"
-        f"                    why memory shaped it.\n"
+        f"                    why memory shaped it. Reference live species only.\n"
         f"Do not include any other keys. Do not wrap in markdown.\n"
     )
 
@@ -234,9 +241,10 @@ def generate_taunt(
     player_mon: Any,
     last_player_move: str | None = None,
     last_rival_move: str | None = None,
+    rival_name: str | None = None,
 ) -> str:
     """Per-turn one-liner. ≤45 chars."""
-    persona = _read_persona()
+    persona = _read_persona(rival_name)
     label = BATTLE_ID_LABELS.get(battle_id, battle_id)
 
     rival_species = _resolve_species(rival_mon.species)
@@ -295,21 +303,41 @@ def summarize_battle(
     outcome: str,
     battle_log: list[Any],
     game_state: Any = None,
+    rival_name: str | None = None,
 ) -> dict[str, str]:
     """Post-battle: GPT summary + lessons appended to memory.md.
 
     Returns: {"summary": str, "lessons": str}
     """
-    persona = _read_persona()
+    persona = _read_persona(rival_name)
     memory = _read_recent_memory()
     label = BATTLE_ID_LABELS.get(battle_id, battle_id)
     log_block = _format_battle_log(battle_log)
+
+    # Extract the actual species each side used so the prompt can anchor
+    # GPT's summary on ground-truth instead of memory hallucinations. The
+    # battle_log entries already have actor_species resolved by name in the
+    # log_block above, but spelling them out explicitly here is the cheapest
+    # way to stop GPT from inverting parties.
+    rival_species_seen = sorted({
+        _resolve_species(e.actor_species)
+        for e in battle_log if e.side == "rival"
+    })
+    player_species_seen = sorted({
+        _resolve_species(e.actor_species)
+        for e in battle_log if e.side == "player"
+    })
+    rival_species_str = ", ".join(rival_species_seen) or "unknown"
+    player_species_str = ", ".join(player_species_seen) or "unknown"
 
     system_prompt = (
         f"{persona}\n\n"
         f"---\n"
         f"## Battle Just Finished — {label}\n"
         f"Outcome: {outcome.upper()}\n\n"
+        f"### CRITICAL — Ground Truth (do not contradict this)\n"
+        f"Your species (rival side): {rival_species_str}\n"
+        f"Player's species: {player_species_str}\n\n"
         f"### Move Log (chronological)\n"
         f"{log_block}\n\n"
         f"## Your Earlier Memory\n"
@@ -317,9 +345,12 @@ def summarize_battle(
         f"## Output\n"
         f"You must output ONE JSON object with exactly these keys:\n"
         f"  summary: string under 200 chars — what happened in this battle.\n"
-        f"           Stay in character as Gary thinking back on the fight.\n"
-        f"  lessons: string under 200 chars — what you (Gary) learned about\n"
-        f"           the player's preferences and what counter you should pick\n"
+        f"           Stay in character thinking back on the fight. ONLY name\n"
+        f"           species from the Ground Truth block above. NEVER invert\n"
+        f"           the parties — your side used {rival_species_str}, the\n"
+        f"           player used {player_species_str}.\n"
+        f"  lessons: string under 200 chars — what you learned about the\n"
+        f"           player's preferences and what counter you should pick\n"
         f"           next time. Concrete and actionable, no fluff.\n"
         f"Do not include other keys. Do not wrap in markdown.\n"
     )

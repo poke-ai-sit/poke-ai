@@ -13,7 +13,7 @@ from pokelive_bridge.battle_agent import (
 )
 from pokelive_bridge.openai_client import ask_codex
 from pokelive_bridge.pokemon_text import format_dialog_hex, sanitize_dialog_text
-from pokelive_bridge.rival_agent import rival_react
+from pokelive_bridge.rival_agent import reset_memory, rival_react
 
 
 class HealthResponse(BaseModel):
@@ -77,6 +77,7 @@ class RivalEventRequest(BaseModel):
     game_state: GameStateRequest
     party: list[PartyEntryRequest] | None = None
     details: dict[str, Any] | None = None
+    rival_name: str | None = None
 
 
 class RivalEventResponse(BaseModel):
@@ -123,6 +124,7 @@ class RivalBattlePlanRequest(BaseModel):
     player_party: list[BattleMonState]
     rival_party: list[BattleMonState] | None = None
     game_state: GameStateRequest | None = None
+    rival_name: str | None = None
 
 
 class RivalBattlePlanResponse(BaseModel):
@@ -140,6 +142,7 @@ class RivalTauntRequest(BaseModel):
     player_mon: BattleMonState
     last_player_move: str | None = None
     last_rival_move: str | None = None
+    rival_name: str | None = None
 
 
 class RivalTauntResponse(BaseModel):
@@ -152,6 +155,7 @@ class RivalBattleSummaryRequest(BaseModel):
     outcome: Literal["won", "lost", "fled"]
     battle_log: list[BattleLogEntry]
     game_state: GameStateRequest | None = None
+    rival_name: str | None = None
 
 
 class RivalBattleSummaryResponse(BaseModel):
@@ -217,6 +221,22 @@ def post_codex_chat(chat: CodexChatRequest) -> CodexChatResponse:
     )
 
 
+class RivalMemoryResetResponse(BaseModel):
+    reset: bool
+
+
+@app.post("/rival-memory-reset")
+def post_rival_memory_reset() -> RivalMemoryResetResponse:
+    """Wipe agents/rival/memory.md back to template state.
+
+    Called by Lua once on script load so every demo run starts with a clean
+    rival memory — prevents GPT from anchoring on stale party data and
+    inverting the actual battle parties in its opening line.
+    """
+    reset_memory()
+    return RivalMemoryResetResponse(reset=True)
+
+
 @app.post("/rival-event")
 def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
     global latest_game_state
@@ -228,11 +248,12 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         game_state=event.game_state,
         party=event.party,
         details=event.details,
+        rival_name=event.rival_name,
     )
     message = result["message"]
 
     return RivalEventResponse(
-        speaker="Gary",
+        speaker=event.rival_name or "Rival",
         message=message,
         message_hex=format_dialog_hex(message, chars_per_line=200, lines_per_page=1),
         action="approach",
@@ -254,6 +275,7 @@ def post_rival_battle_plan(req: RivalBattlePlanRequest) -> RivalBattlePlanRespon
         player_party=req.player_party,
         rival_party=req.rival_party,
         game_state=req.game_state,
+        rival_name=req.rival_name,
     )
 
     opening = plan["opening_taunt"]
@@ -277,6 +299,7 @@ def post_rival_taunt(req: RivalTauntRequest) -> RivalTauntResponse:
         player_mon=req.player_mon,
         last_player_move=req.last_player_move,
         last_rival_move=req.last_rival_move,
+        rival_name=req.rival_name,
     )
     return RivalTauntResponse(
         taunt=taunt,
@@ -298,6 +321,7 @@ def post_rival_battle_summary(
         outcome=req.outcome,
         battle_log=req.battle_log,
         game_state=req.game_state,
+        rival_name=req.rival_name,
     )
     return RivalBattleSummaryResponse(
         summary=result["summary"],

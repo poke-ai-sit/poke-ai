@@ -104,6 +104,14 @@ local RIVAL_GRACE_FRAMES = 60
 -- Party-count byte lives at SaveBlock1 + 0x34 (verified in pokefirered global.h).
 local SAVE_BLOCK_1_OFFSET_PARTY_COUNT = 0x34
 
+-- Rival name lives at SaveBlock1 + 0x3A4C, 7 bytes + EOS, FireRed-encoded.
+-- The player types this at the new-game intro; default is "BLUE"/"GARY"/"JOHN"/"JACK"
+-- depending on which option they pick. We pull it on first valid read and pass
+-- it through every rival-* request so the bridge prompts and memory entries
+-- use the actual name instead of hardcoded "Gary".
+local SAVE_BLOCK_1_OFFSET_RIVAL_NAME = 0x3A4C
+local RIVAL_NAME_LENGTH = 7
+
 -- ===========================================================================
 -- Smart Gary battle-state polling — SPRINT-005 Phase 4 SCAFFOLDING
 -- ===========================================================================
@@ -203,6 +211,13 @@ local second_capture_anchor_position = nil
 -- battle-entry watcher to pick battle_id (battle_2_first_capture vs.
 -- battle_3_second_capture). Cleared once consumed so it doesn't bleed.
 local last_rival_trigger = nil
+
+-- Memory-reset state. Fired ONCE per Lua script load: the moment SaveBlock1
+-- is reachable AND nothing else is in flight, we POST /rival-memory-reset
+-- to wipe agents/rival/memory.md back to its template. Without this, GPT
+-- anchors on stale entries from prior demo runs and inverts the actual
+-- battle parties in its summaries.
+local memory_reset_state = "pending"  -- "pending" → "in_flight" → "done"
 
 -- Smart Gary battle log accumulator. Cleared at battle start, sent to
 -- /rival-battle-summary at battle end.
@@ -589,6 +604,19 @@ local function json_kv_pairs(t)
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
+-- Forward declaration: read_rival_name is defined further down (it depends
+-- on emu:read* + decode_table). This local lets every JSON builder above
+-- close over the eventual binding.
+local read_rival_name
+
+local function rival_name_field()
+  local name = read_rival_name and read_rival_name() or nil
+  if name and #name > 0 then
+    return ',"rival_name":"' .. json_escape(name) .. '"'
+  end
+  return ""
+end
+
 local function json_rival_event(trigger, state, party, details)
   local party_json = ""
   if party then
@@ -605,11 +633,12 @@ local function json_rival_event(trigger, state, party, details)
   end
 
   return string.format(
-    '{"trigger":"%s","game_state":%s%s%s}',
+    '{"trigger":"%s","game_state":%s%s%s%s}',
     json_escape(trigger),
     json_game_state(state),
     party_json,
-    details_json
+    details_json,
+    rival_name_field()
   )
 end
 
@@ -619,6 +648,20 @@ local function post_rival_event(trigger, state, party, details)
     json_rival_event(trigger, state, party, details),
     '"action"',
     "rival-event",
+    nil
+  )
+end
+
+-- Fire-and-forget reset of agents/rival/memory.md. Called once per Lua
+-- script load so each demo run starts with a clean slate (otherwise GPT
+-- anchors on prior-session entries and inverts party species in its
+-- opening line / summary).
+local function post_rival_memory_reset()
+  return post_json(
+    "/rival-memory-reset",
+    "{}",
+    '"reset"',
+    "rival-memory-reset",
     nil
   )
 end
@@ -672,6 +715,37 @@ local function read_party_count()
     return nil
   end
   return emu:read8(save_block_1 + SAVE_BLOCK_1_OFFSET_PARTY_COUNT)
+end
+
+-- Read the rival's name from SaveBlock1 + 0x3A4C, decode the 7-byte
+-- FireRed-encoded string into ASCII via decode_table. Returns nil if the
+-- save block isn't ready yet (pre-intro), or if the name is empty/garbage.
+-- Cached after first successful read so we don't re-decode on every frame.
+-- Note: `read_rival_name` is forward-declared higher up so the JSON helpers
+-- can close over it; here we assign the implementation rather than re-`local`.
+local cached_rival_name = nil
+read_rival_name = function()
+  if cached_rival_name then return cached_rival_name end
+  local save_block_1 = emu:read32(SAVE_BLOCK_1_PTR)
+  if save_block_1 == 0 or save_block_1 == 0xFFFFFFFF then
+    return nil
+  end
+  local chars = {}
+  for i = 0, RIVAL_NAME_LENGTH - 1 do
+    local byte = emu:read8(save_block_1 + SAVE_BLOCK_1_OFFSET_RIVAL_NAME + i)
+    if byte == 0xFF then break end
+    local ch = decode_table[byte]
+    if ch and ch ~= " " then
+      chars[#chars + 1] = ch
+    elseif #chars > 0 then
+      -- Mid-name space — preserve only if followed by another printable.
+      chars[#chars + 1] = " "
+    end
+  end
+  local name = table.concat(chars):gsub("%s+$", "")
+  if #name == 0 then return nil end
+  cached_rival_name = name
+  return name
 end
 
 local function fire_rival_event(trigger, state, party, details)
@@ -795,11 +869,12 @@ local function json_battle_plan_request(battle_id, player_party, rival_party, st
     state_field = ',"game_state":' .. json_game_state(state)
   end
   return string.format(
-    '{"battle_id":"%s","player_party":[%s]%s%s}',
+    '{"battle_id":"%s","player_party":[%s]%s%s%s}',
     json_escape(battle_id),
     table.concat(pp_parts, ","),
     rp_field,
-    state_field
+    state_field,
+    rival_name_field()
   )
 end
 
@@ -819,11 +894,12 @@ local function post_rival_battle_summary(battle_id, outcome, log_entries, state)
     state_field = ',"game_state":' .. json_game_state(state)
   end
   local body = string.format(
-    '{"battle_id":"%s","outcome":"%s","battle_log":%s%s}',
+    '{"battle_id":"%s","outcome":"%s","battle_log":%s%s%s}',
     json_escape(battle_id),
     json_escape(outcome),
     json_battle_log_entries(log_entries),
-    state_field
+    state_field,
+    rival_name_field()
   )
   return post_json(
     "/rival-battle-summary",
@@ -1267,7 +1343,8 @@ local function poll_pending_response()
         local ok, reason = write_rival_ai_plan(move_scores, counter_choice)
         if ok then
           write_line(string.format(
-            "Smart Gary plan armed: counter=%d scores=[%d,%d,%d,%d]",
+            "Smart %s plan armed: counter=%d scores=[%d,%d,%d,%d]",
+            read_rival_name() or "Rival",
             counter_choice or 0,
             move_scores[1], move_scores[2], move_scores[3], move_scores[4]
           ))
@@ -1281,14 +1358,17 @@ local function poll_pending_response()
       -- the judge can see/narrate it. Routing through gRivalEncounterBuffer
       -- isn't viable mid-battle (the encounter cinematic only fires from a
       -- map_script_2 frame handler on the overworld, not inside a battle).
+      local rival_label = read_rival_name() or "Rival"
       if opening_taunt and #opening_taunt > 0 then
-        write_line('Gary opening taunt: "' .. opening_taunt .. '"')
+        write_line(rival_label .. ' opening taunt: "' .. opening_taunt .. '"')
       end
       if strategy_summary and #strategy_summary > 0 then
-        write_line("Gary strategy: " .. strategy_summary)
+        write_line(rival_label .. " strategy: " .. strategy_summary)
       end
     elseif pending.label == "rival-battle-summary" then
       write_line("Battle summary acknowledged by bridge.")
+    elseif pending.label == "rival-memory-reset" then
+      write_line("Rival memory reset acknowledged by bridge.")
     end
     pending = nil
     return
@@ -1352,10 +1432,32 @@ write_line("PokeLive Codex mailbox bridge loaded.")
 write_line("Start FastAPI first: cd bridge && ./run.sh")
 write_line("Use this with the patched pret/pokefirered ROM, not the runtime textbox-injection demo.")
 
+local function maybe_reset_rival_memory()
+  if memory_reset_state ~= "pending" then return end
+  if pending then return end
+  -- Wait for SaveBlock1 to be reachable so the bridge isn't reset before the
+  -- player has actually loaded a save (otherwise a fresh boot's title screen
+  -- would clear memory once, fine; but cleaner to wait for game state).
+  local save_block_1 = emu:read32(SAVE_BLOCK_1_PTR)
+  if save_block_1 == 0 or save_block_1 == 0xFFFFFFFF then return end
+  memory_reset_state = "in_flight"
+  local _, err = post_rival_memory_reset()
+  if err then
+    write_line("rival-memory-reset POST failed: " .. tostring(err))
+    -- Stay in_flight; on next frame `pending` is nil and we'd retry, but
+    -- we treat as done to avoid a hot loop on a broken bridge.
+    memory_reset_state = "done"
+  else
+    memory_reset_state = "done"
+    write_line("Rival memory reset request sent.")
+  end
+end
+
 callbacks:add("frame", function()
   frame_count = frame_count + 1
   poll_pending_response()
   poll_codex_mailbox()
+  maybe_reset_rival_memory()
   check_rival_triggers()
   if BATTLE_POLLING_ENABLED then
     check_battle_transitions()
