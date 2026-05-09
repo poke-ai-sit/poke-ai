@@ -979,6 +979,33 @@ local function write_party_override(slots)
 
   -- Arm LAST — C hook only triggers once this byte goes non-zero.
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT, count)
+
+  -- Readback verification. If the C struct's actual offset for
+  -- partyOverride[0] doesn't match RIVAL_AI_OFF_PARTY_OVERRIDE_BASE
+  -- (e.g. compiler inserted hidden padding), our writes land in the
+  -- wrong byte and the rival shows up with whatever junk lives there.
+  -- This is the smoking-gun log for the L84 Venusaur class of bugs.
+  local rb_count = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT)
+  if rb_count ~= count then
+    write_line(string.format(
+      "PARTY OVERRIDE COUNT MISMATCH: wrote %d, read %d", count, rb_count
+    ))
+  end
+  for i = 1, count do
+    local base = RIVAL_AI_BUFFER_ADDR
+                 + RIVAL_AI_OFF_PARTY_OVERRIDE_BASE
+                 + (i - 1) * RIVAL_AI_PARTY_SLOT_STRIDE
+    local rb_species = emu:read16(base + RIVAL_AI_PARTY_SLOT_OFF_SPECIES)
+    local rb_level   = emu:read8 (base + RIVAL_AI_PARTY_SLOT_OFF_LEVEL)
+    local exp_species = slots[i].species or 0
+    local exp_level   = slots[i].level or 0
+    if rb_species ~= exp_species or rb_level ~= exp_level then
+      write_line(string.format(
+        "PARTY OVERRIDE READBACK MISMATCH slot %d: wrote sp=%d lv=%d -> read sp=%d lv=%d (C offset is wrong!)",
+        i, exp_species, exp_level, rb_species, rb_level
+      ))
+    end
+  end
   return true, count
 end
 

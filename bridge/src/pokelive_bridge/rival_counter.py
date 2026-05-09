@@ -34,6 +34,7 @@ SPECIES_RATTATA = 19
 SPECIES_PIKACHU = 25
 SPECIES_GEODUDE = 74
 SPECIES_MANKEY = 56
+SPECIES_MACHOP = 66
 
 MOVE_NONE = 0
 MOVE_TACKLE = 33
@@ -125,6 +126,7 @@ SPECIES_DISPLAY_NAME: dict[int, str] = {
     SPECIES_PIKACHU: "PIKACHU",
     SPECIES_GEODUDE: "GEODUDE",
     SPECIES_MANKEY: "MANKEY",
+    SPECIES_MACHOP: "MACHOP",
 }
 
 
@@ -193,8 +195,10 @@ ROSTER: list[RosterMon] = [
               [MOVE_THUNDER_SHOCK, MOVE_QUICK_ATTACK, MOVE_GROWL, MOVE_THUNDER_WAVE]),
     RosterMon(SPECIES_GEODUDE,    "GEODUDE",   "Rock",     "Rock",
               [MOVE_TACKLE, MOVE_ROCK_THROW, MOVE_DEFENSE_CURL, MOVE_NONE]),
-    RosterMon(SPECIES_MANKEY,     "MANKEY",    "Fighting", "Fighting",
-              [MOVE_SCRATCH, MOVE_LOW_KICK, MOVE_KARATE_CHOP, MOVE_LEER]),
+    # Per Edmund's demo spec: Rattata (Normal) -> Machop. Mankey is also
+    # Fighting but Machop is the more iconic / readable counter visually.
+    RosterMon(SPECIES_MACHOP,     "MACHOP",    "Fighting", "Fighting",
+              [MOVE_LOW_KICK, MOVE_KARATE_CHOP, MOVE_LEER, MOVE_NONE]),
     RosterMon(SPECIES_PIDGEY,     "PIDGEY",    "Flying",   "Flying",
               [MOVE_TACKLE, MOVE_GUST, MOVE_QUICK_ATTACK, MOVE_SAND_ATTACK]),
 ]
@@ -320,7 +324,9 @@ def pick_rival_party(
     ))
     used = {starter_mon.species}
 
-    # Slot 1..N-1 — counter the rest of the player's party.
+    # Slot 1..N-1 — counter the rest of the player's party. Per Edmund's
+    # demo spec, every slot ships at level 5 (no level scaling); the
+    # type-counter is the visible signal, not the levels.
     for idx in range(1, target_size):
         if party and idx < len(party):
             p_species = getattr(party[idx], "species", None)
@@ -331,7 +337,7 @@ def pick_rival_party(
         mon, reason = _pick_counter(p_type, avoid=used, fallback_idx=idx)
         used.add(mon.species)
         slots.append(RivalSlot(
-            species=mon.species, level=3,
+            species=mon.species, level=5,
             moves=list(mon.moves),
             species_name=mon.name,
             attack_type=mon.attack_type,
