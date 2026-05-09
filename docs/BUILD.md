@@ -159,13 +159,48 @@ ADVICE prompt includes the player's live party and next-gym context so GPT gives
 
 ---
 
-### SPRINT-004 — Personalization: AI Pokémon Creator
-**Owner:** Desmond Chye Zhi Hao
-**Status:** [x] Closed — not shipping
-**Branch:** —
+### SPRINT-004 — Pokémon Sprite Generator Website (PokéLive Creator)
+**Owner:** Shaun Liew Xin Hong
+**Status:** [x] Done
+**Branch:** feat/004-pokemon-creator (merged to dev, deleted 2026-05-09)
+**Started:** 2026-05-09
 **Closed:** 2026-05-09
 
-Dropped from hackathon scope with team consent. Custom-Pokémon EWRAM injection is non-trivial (checksum recalculation, save-block coherence) and the Smart Gary track is the stronger demo. Notes preserved in git history (commit before this one) if we ever pick it back up.
+#### Goal
+Standalone Next.js 14 website where users describe a custom Pokémon concept, click Generate, and get a GBA-style pixel art sprite (front + back) and a 40×40 party icon — all powered by OpenAI `gpt-image-2`.
+
+#### Tasks
+- [x] Scaffold `website/` with Next.js 14 App Router + TypeScript + TailwindCSS
+- [x] Press Start 2P font + authentic FireRed colour system (red-dominant palette)
+- [x] `lib/openai-image.ts` — `generateSprite()` and `editSpriteWithReference()` (lazy OpenAI client)
+- [x] `lib/prompts.ts` — `SYSTEM_SPRITE_PROMPT` + `buildFinalPrompt()`
+- [x] `lib/icon-extract.ts` — `sharp` nearest-neighbor crop to 40×40 party icon
+- [x] `lib/validation.ts` — Zod schemas for request/response
+- [x] `app/api/generate-sprite/route.ts` — POST handler, `runtime="nodejs"`, `maxDuration=120`
+- [x] `components/HomeClient.tsx` — `useReducer` state machine (idle → loading → success/error)
+- [x] `components/SpriteGeneratorForm.tsx` — textarea, quick-example chips (Rusty Car, Ferrari, Smooth Criminal), ImageUpload
+- [x] `components/SpritePreview.tsx` + `components/IconPreview.tsx` — pixelated upscale + download
+- [x] `components/LoadingDialog.tsx` + `components/ErrorDialog.tsx` — HP-bar loading animation, red error panel
+- [x] `components/ImageUpload.tsx` — drag-drop + file picker + client-side canvas resize
+- [x] Fix `quality: "high"` → `quality: "low"` (high=90s+ timeout, low=16-32s) — root cause of generation timeout
+- [x] `npm run build` passes with zero TypeScript errors
+- [x] E2E smoke test: Rusty Car prompt → sprite returned in ~23s
+
+#### Notes
+- `quality: "low"` is correct for GBA pixel art — no perceptible quality loss at 64×64 sprite resolution.
+- `gpt-image-2` does NOT accept `response_format` parameter (returns 400); `b64_json` is the default response — do not pass it explicitly.
+- API key is the same `OPENAI_API_KEY` used by the FastAPI bridge — copy from `bridge/.env` into `website/.env.local`.
+- Dev server runs on `PORT=3001` to avoid conflict with bridge on `8000`; or just use `3000` if bridge is off.
+- `<img>` is used (not Next.js `<Image>`) intentionally — `image-rendering: pixelated` on base64 data URLs requires native `<img>`.
+
+#### Run the Website
+```bash
+cd website
+cp .env.example .env.local   # then fill in OPENAI_API_KEY
+npm install
+npm run dev                  # → http://localhost:3000 (or PORT=3001 if bridge is running)
+npm run build                # production build check
+```
 
 ---
 
