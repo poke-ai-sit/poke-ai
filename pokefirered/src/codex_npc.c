@@ -278,8 +278,13 @@ void BufferRivalMessage(void)
  *   msgbox "{STR_VAR_1}$"
  *   ... etc.
  * Cycling through gStringVar1 lets us reuse one msgbox label across all
- * three pages without needing gStringVar2/3 (which are only 20 bytes). */
-static u8 sRivalCallPageIndex = 0;
+ * three pages without needing gStringVar2/3 (which are only 20 bytes).
+ *
+ * EWRAM_DATA placement is required — without it the linker drops this static
+ * into a discarded .data section under the MODERN=1 build, breaking the
+ * elf link with "defined in discarded section .data". The other statics in
+ * this file (sCodexPromptBuffer) use the same pattern. */
+static EWRAM_DATA u8 sRivalCallPageIndex = 0;
 
 void ResetRivalCallPageIndex(void)
 {
