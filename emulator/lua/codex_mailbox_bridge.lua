@@ -106,8 +106,13 @@ local OAKS_LAB_MAP_SIG     = "4:3"
 -- baseline party-size read doesn't false-fire on hot-reload.
 local RIVAL_GRACE_FRAMES = 60
 
--- Party-count byte lives at SaveBlock1 + 0x34 (verified in pokefirered global.h).
-local SAVE_BLOCK_1_OFFSET_PARTY_COUNT = 0x34
+-- Party count is a top-level BSS global, NOT inside SaveBlock1. The previous
+-- code read SaveBlock1 + 0x34 and got junk (or 0 on the MODERN build), which
+-- broke first_capture/second_capture detection. The map file gives us:
+--   gPlayerPartyCount @ 0x02024049
+--   gPlayerParty       @ 0x020242a4
+-- These are direct EWRAM addresses — no pointer indirection needed.
+local PLAYER_PARTY_COUNT_ADDR = 0x02024049
 
 -- Rival name lives at SaveBlock1 + 0x3A4C, 7 bytes + EOS, FireRed-encoded.
 -- The player types this at the new-game intro; default is "BLUE"/"GARY"/"JOHN"/"JACK"
@@ -775,11 +780,7 @@ local function write_hex_to_rival_buffer(hex_text)
 end
 
 local function read_party_count()
-  local save_block_1 = emu:read32(SAVE_BLOCK_1_PTR)
-  if save_block_1 == 0 or save_block_1 == 0xFFFFFFFF then
-    return nil
-  end
-  return emu:read8(save_block_1 + SAVE_BLOCK_1_OFFSET_PARTY_COUNT)
+  return emu:read8(PLAYER_PARTY_COUNT_ADDR)
 end
 
 -- Read the rival's name from SaveBlock1 + 0x3A4C, decode the 7-byte
