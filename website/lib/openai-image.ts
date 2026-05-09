@@ -13,7 +13,7 @@ export async function generateSprite(userDescription: string): Promise<string> {
     model: "gpt-image-2",
     prompt: `${SYSTEM_SPRITE_PROMPT}\n\n${buildFinalPrompt(userDescription)}`,
     size: "1024x1024",
-    quality: "high",
+    quality: "low", // high=90s+ (timeout), medium=52s, low=16-32s — pixel art needs no higher quality
     n: 1,
   });
   const b64 = result.data?.[0]?.b64_json;
@@ -35,7 +35,7 @@ export async function editSpriteWithReference(
     image: imageFile,
     prompt: `${SYSTEM_SPRITE_PROMPT}\n\n${buildFinalPrompt(userDescription)}`,
     size: "1024x1024",
-    quality: "high",
+    quality: "low", // high=90s+ (timeout) — pixel art sprite needs no higher quality
     n: 1,
   });
   const b64 = result.data?.[0]?.b64_json;

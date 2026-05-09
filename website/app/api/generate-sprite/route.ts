@@ -4,7 +4,7 @@ import { generateSprite, editSpriteWithReference } from "@/lib/openai-image";
 import { extractIcon } from "@/lib/icon-extract";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   let body: unknown;
