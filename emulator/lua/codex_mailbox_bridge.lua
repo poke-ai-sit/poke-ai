@@ -474,6 +474,20 @@ local RIVAL_AI_OFF_MOVE_SCORE      = 5
 local RIVAL_AI_OFF_COUNTER_CHOICE  = 9
 local RIVAL_AI_OFF_RESULT_PENDING  = 10
 
+-- Reads the live EWRAM AI buffer and returns (active, scores_table).
+-- Converts s8 two's-complement bytes back to signed integers.
+local function read_rival_ai_ewram()
+  if RIVAL_AI_BUFFER_ADDR == 0 then return nil, nil end
+  local active = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE)
+  local scores = {}
+  for i = 0, 3 do
+    local b = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_MOVE_SCORE + i)
+    if b >= 128 then b = b - 256 end  -- unsigned byte → signed s8
+    scores[i + 1] = b
+  end
+  return active, scores
+end
+
 -- Writes a Smart-Gary AI plan into gRivalAIBuffer. Order matters:
 --   1. magic + counterChoice + moveScore[0..3]   (clamped, negatives → two's complement)
 --   2. active = 1                                (LAST — C hook gates on this byte)
@@ -507,20 +521,6 @@ end
 local function clear_rival_ai_plan()
   if RIVAL_AI_BUFFER_ADDR == 0 then return end
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE, 0)
-end
-
--- Reads the live EWRAM AI buffer and returns (active, scores_table).
--- Converts s8 two's-complement bytes back to signed integers.
-local function read_rival_ai_ewram()
-  if RIVAL_AI_BUFFER_ADDR == 0 then return nil, nil end
-  local active = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_ACTIVE)
-  local scores = {}
-  for i = 0, 3 do
-    local b = emu:read8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_MOVE_SCORE + i)
-    if b >= 128 then b = b - 256 end  -- unsigned byte → signed s8
-    scores[i + 1] = b
-  end
-  return active, scores
 end
 
 local function read_game_state()
