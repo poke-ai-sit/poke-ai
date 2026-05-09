@@ -190,6 +190,16 @@ local last_logged_player_move = -1
 local last_logged_rival_move = -1
 local last_outcome_seen = 0
 
+-- Hour 4b — deferred battle-plan POST.
+-- check_battle_transitions() used to early-return when `pending` was set, which
+-- caused Battle 1 (Oak's Lab) to silently miss its /rival-battle-plan POST: a
+-- /game-state POST queued by the player's last walking step into the lab was
+-- still in flight during the narrow window where the watcher would otherwise
+-- bootstrap. We now ALWAYS run the state machine; if the POST can't fire this
+-- frame because another request is in flight, we stash the payload here and
+-- retry next frame from the frame callback.
+local deferred_battle_plan = nil   -- { battle_id, player_party, rival_party, state }
+
 local decode_table = {
   [0x00] = " ",
   [0xAB] = ".",
@@ -821,6 +831,9 @@ local function reset_battle_state()
   last_logged_player_move = -1
   last_logged_rival_move = -1
   last_outcome_seen = 0
+  -- Drop any battle-plan POST that was queued for a battle that just ended
+  -- before its retry window came up — stale and would confuse the bridge.
+  deferred_battle_plan = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -835,16 +848,62 @@ end
 -- check_battle_transitions() inside the frame callback (after
 -- check_rival_triggers). See docs/HANDOFF_smart_gary.md.
 -- ---------------------------------------------------------------------------
-local function check_battle_transitions()
-  if pending then return end
-  local outcome = read_battle_outcome()
+-- Try to fire a battle-plan POST. If `pending` is busy, stash the payload in
+-- `deferred_battle_plan` and the frame callback will retry next frame.
+local function fire_or_defer_battle_plan(battle_id, player_party, rival_party, state)
+  if pending then
+    deferred_battle_plan = {
+      battle_id = battle_id,
+      player_party = player_party,
+      rival_party = rival_party,
+      state = state,
+    }
+    write_line(string.format(
+      "POST /rival-battle-plan deferred (pending=%s) id=%s",
+      tostring(pending and pending.label or "?"), battle_id
+    ))
+    return
+  end
+  write_line(string.format(
+    "POST /rival-battle-plan id=%s player_party=%d rival_active=%d",
+    battle_id, #player_party, rival_party and #rival_party or 0
+  ))
+  local _, err = post_rival_battle_plan(battle_id, player_party, rival_party, state)
+  if err then
+    write_line("rival-battle-plan POST failed: " .. tostring(err))
+  end
+end
 
-  -- ENTRY: was 0 → still 0 isn't a transition; was non-zero → 0 means a new
-  -- battle just started. We use `in_battle` flag to track logical state
-  -- because outcome=0 happens both pre-battle and during.
-  -- For simplicity: we treat the first observation of outcome=0 with
-  -- gBattlerAttacker valid as battle-in-progress.
-  -- (Edmund: refine this when validating in mGBA.)
+local function flush_deferred_battle_plan()
+  if not deferred_battle_plan or pending then return end
+  local d = deferred_battle_plan
+  deferred_battle_plan = nil
+  write_line(string.format(
+    "POST /rival-battle-plan (retry) id=%s player_party=%d rival_active=%d",
+    d.battle_id, #d.player_party, d.rival_party and #d.rival_party or 0
+  ))
+  local _, err = post_rival_battle_plan(d.battle_id, d.player_party, d.rival_party, d.state)
+  if err then
+    write_line("rival-battle-plan POST (retry) failed: " .. tostring(err))
+  end
+end
+
+-- Returns true iff the rival side of the battle struct shows a loaded mon —
+-- the most reliable signal that an actual battle (not just a stale outcome=0
+-- byte on the overworld) is currently active.
+local function rival_battler_is_loaded()
+  local rival_lead_species = emu:read16(BATTLE_MONS_ADDR + BATTLE_MON_STRIDE + BMON_SPECIES)
+  return rival_lead_species ~= 0
+end
+
+local function check_battle_transitions()
+  -- NOTE: we deliberately do NOT early-return on `pending`. Hour 4b regression:
+  -- a /game-state POST in flight during the player's lab-entry frame caused
+  -- Battle 1 to skip its plan POST. The watcher must always update its state
+  -- machine; only the outbound POST is gated (and deferred via
+  -- `deferred_battle_plan` when pending is busy).
+
+  local outcome = read_battle_outcome()
 
   if outcome ~= BATTLE_OUTCOME_IN_PROGRESS then
     if in_battle then
@@ -866,76 +925,82 @@ local function check_battle_transitions()
     return
   end
 
-  -- We're in a battle. Bootstrap battle_id from current map if not set.
+  -- outcome == 0. Bootstrap if not already in_battle. Hour 4b: require a
+  -- secondary signal (rival battler loaded in gBattleMons[1]) so we don't
+  -- false-positive on the overworld where outcome can also read 0.
   if not in_battle then
+    if not rival_battler_is_loaded() then
+      -- Still on overworld (or in pre-battle cinematic) — wait for the rival
+      -- battler to materialise. Don't touch in_battle yet.
+      return
+    end
+
     local state = read_game_state()
     local sig = nil
     if state then
       sig = string.format("%d:%d", state.map_group, state.map_num)
       current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
     end
-    if current_battle_id then
+    if not current_battle_id then
+      -- Battle is real but on a map we don't track. Still mark in_battle so
+      -- exit detection works, but skip plan + summary POSTs.
       in_battle = true
       current_turn = 1
       battle_log = {}
-      write_line(string.format(
-        "BATTLE START: id=%s",
-        current_battle_id
-      ))
+      write_line(string.format("BATTLE START: id=<untracked> map=%s", tostring(sig)))
+      return
+    end
 
-      -- Hour 4: gather both parties + POST /rival-battle-plan so the AI hook
-      -- in BattleAI_ChooseMoveOrAction picks up the score boosts on Gary's
-      -- first move. Player party comes from the live gPokelivePartyData
-      -- struct (already populated by UpdateCodexPartyData when the rival
-      -- battle script ran). Rival party is reconstructed from gBattleMons
-      -- slots 1 and 3 — only the active mon is fully visible mid-battle, so
-      -- the bridge plan reasons mostly off the player party + battle_id
-      -- archetype.
-      local player_party_full = read_party_data()
-      local player_party_for_plan = {}
-      if player_party_full then
-        for _, e in ipairs(player_party_full) do
-          player_party_for_plan[#player_party_for_plan + 1] = {
-            species = e.species,
-            level = e.level,
-            hp = e.hp,
-            max_hp = e.max_hp,
-            moves = e.moves,
-          }
-        end
-      else
-        -- Fallback: just use player active slot 0
-        local pm = read_battle_mon(0)
-        if pm.species ~= 0 then
-          player_party_for_plan[1] = pm
-        end
-      end
+    in_battle = true
+    current_turn = 1
+    battle_log = {}
+    write_line(string.format("BATTLE START: id=%s map=%s", current_battle_id, sig))
 
-      local rival_party_for_plan = {}
-      for _, slot in ipairs({1, 3}) do
-        local rm = read_battle_mon(slot)
-        if rm.species ~= 0 then
-          rival_party_for_plan[#rival_party_for_plan + 1] = rm
-        end
+    -- Hour 4: gather both parties + POST /rival-battle-plan so the AI hook
+    -- in BattleAI_ChooseMoveOrAction picks up the score boosts on Gary's
+    -- first move. Player party comes from the live gPokelivePartyData
+    -- struct (already populated by UpdateCodexPartyData when the rival
+    -- battle script ran). Rival party is reconstructed from gBattleMons
+    -- slots 1 and 3 — only the active mon is fully visible mid-battle, so
+    -- the bridge plan reasons mostly off the player party + battle_id
+    -- archetype.
+    local player_party_full = read_party_data()
+    local player_party_for_plan = {}
+    if player_party_full then
+      for _, e in ipairs(player_party_full) do
+        player_party_for_plan[#player_party_for_plan + 1] = {
+          species = e.species,
+          level = e.level,
+          hp = e.hp,
+          max_hp = e.max_hp,
+          moves = e.moves,
+        }
       end
+    else
+      -- Fallback: use player active slot 0 from gBattleMons (now populated).
+      local pm = read_battle_mon(0)
+      if pm.species ~= 0 then
+        player_party_for_plan[1] = pm
+      end
+    end
 
-      if #player_party_for_plan > 0 then
-        write_line(string.format(
-          "POST /rival-battle-plan id=%s player_party=%d rival_active=%d",
-          current_battle_id, #player_party_for_plan, #rival_party_for_plan
-        ))
-        local _, err = post_rival_battle_plan(
-          current_battle_id,
-          player_party_for_plan,
-          #rival_party_for_plan > 0 and rival_party_for_plan or nil,
-          state
-        )
-        if err then
-          write_line("rival-battle-plan POST failed: " .. tostring(err))
-        end
-      else
-        write_line("rival-battle-plan skipped: no player party data available")
+    local rival_party_for_plan = {}
+    for _, slot in ipairs({1, 3}) do
+      local rm = read_battle_mon(slot)
+      if rm.species ~= 0 then
+        rival_party_for_plan[#rival_party_for_plan + 1] = rm
       end
+    end
+
+    if #player_party_for_plan > 0 then
+      fire_or_defer_battle_plan(
+        current_battle_id,
+        player_party_for_plan,
+        #rival_party_for_plan > 0 and rival_party_for_plan or nil,
+        state
+      )
+    else
+      write_line("rival-battle-plan skipped: no player party data available")
     end
     return
   end
@@ -1169,6 +1234,14 @@ local function poll_codex_mailbox()
   end
 end
 
+-- Hour 4b chatter reduction. Previously: POST every 5s OR whenever (x,y)
+-- changed = one POST per step. Now: POST only on map change, with a 2s
+-- wall-clock floor as a sanity guard against rapid map flicker. The bridge
+-- already tracks map transitions via /rival-event when relevant; /game-state
+-- is mostly a heartbeat for telemetry.
+local GAME_STATE_MIN_INTERVAL_SECONDS = 2
+local last_sent_state_time = 0
+
 local function send_current_state()
   if pending then
     return
@@ -1180,11 +1253,15 @@ local function send_current_state()
     return
   end
 
-  local signature = string.format("%d:%d:%d:%d", state.map_group, state.map_num, state.x, state.y)
+  local signature = string.format("%d:%d", state.map_group, state.map_num)
   if signature == last_sent_state then
     return
   end
+  if os.time() - last_sent_state_time < GAME_STATE_MIN_INTERVAL_SECONDS then
+    return
+  end
   last_sent_state = signature
+  last_sent_state_time = os.time()
 
   local response, post_error = post_game_state(state)
   if post_error then
@@ -1213,6 +1290,9 @@ callbacks:add("frame", function()
   check_rival_triggers()
   if BATTLE_POLLING_ENABLED then
     check_battle_transitions()
+    -- Hour 4b: if a battle-plan POST got deferred because another request
+    -- was in flight at battle-start time, retry as soon as `pending` clears.
+    flush_deferred_battle_plan()
   end
 
   if frame_count % SEND_EVERY_FRAMES == 0 then

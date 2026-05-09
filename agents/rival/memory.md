@@ -24,3 +24,41 @@ The rival's GPT prompt sees the most recent N entries (default 60 lines). Older 
 ---
 
 ## Log
+
+## 2026-05-09T02:59
+Trigger: entered_new_area
+Details: from_map=Players House 1F (4:0), to_map=Pallet Town (3:0)
+Map: Pallet Town (3:0)
+Rival said: Back in Pallet Town Already bored
+
+## 2026-05-09T03:00 — Battle 1 — Oak's Lab (RESULT)
+Outcome: LOST
+Turns: 6
+Move log:
+  T1 RIVAL SQUIRTLE used MOVE_33
+  T2 PLAYER CHARMANDER used MOVE_10
+  T2 RIVAL SQUIRTLE used MOVE_39
+  T3 RIVAL SQUIRTLE used MOVE_33
+  T4 RIVAL SQUIRTLE used MOVE_39
+  T5 RIVAL SQUIRTLE used MOVE_33
+Summary: Gary won the first battle at Oak's Lab. Squirtle dominated Charmander with ease.
+Lessons: Player favors fire types with Charmander. Next battle, Gary picks water types like Wartortle for this advantage.
+
+## 2026-05-09T03:00
+Trigger: entered_new_area
+Details: from_map=Professor Oaks Lab (4:3), to_map=Pallet Town (3:0)
+Map: Pallet Town (3:0)
+Rival said: Back in Pallet Town. Already bored.
+
+## 2026-05-09T03:00 — Battle 2 — Route 1 (proactive) (PLAN)
+Counter choice: party slot 0
+Move score boosts: [10, -20, 0, 0]
+Strategy: Player lost to Squirtle in our previous encounter. I'll use Squirtle again with Tackle prioritized, as I already know from past experience that it is effective against Charmander. Water type advantage emphasizes my upper hand.
+
+## 2026-05-09T03:01 — Battle 2 — Route 1 (proactive) (RESULT)
+Outcome: WON
+Turns: 1
+Move log:
+  T1 PLAYER CHARMANDER used MOVE_10
+Summary: I used Squirtle with Tackle to defeat Charmander again. My water type advantage proved too strong, maintaining my lead over the player's fire type.
+Lessons: Player still relies on fire type Charmander. I'll continue using water types like Squirtle to exploit this weakness in further battles.
