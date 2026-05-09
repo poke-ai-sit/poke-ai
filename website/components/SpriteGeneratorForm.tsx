@@ -3,10 +3,12 @@
 import { useState } from "react";
 import ImageUpload from "./ImageUpload";
 
-const EXAMPLE_PROMPTS = [
-  "a small cute rusty old car, round headlights as eyes, happy expression",
-  "a sleek red Ferrari sports car, aggressive headlights, low to the ground, intimidating",
-  "a glowing blue jellyfish made of electricity, trailing sparks, ethereal",
+interface Example { label: string; prompt: string; }
+
+const EXAMPLES: Example[] = [
+  { label: "Rusty Car",   prompt: "a small cute rusty old car, round headlights as eyes, happy expression, compact kei-car body style" },
+  { label: "Red Ferrari", prompt: "a sleek red Ferrari sports car Pokemon, aggressive headlights as eyes, low to the ground, intimidating expression, exhaust flames coming from the back" },
+  { label: "Jellyfish",   prompt: "a glowing blue jellyfish made of pure electricity, trailing crackling sparks, translucent bell, ethereal glow" },
 ];
 
 interface SpriteGeneratorFormProps {
@@ -14,10 +16,7 @@ interface SpriteGeneratorFormProps {
   isLoading: boolean;
 }
 
-export default function SpriteGeneratorForm({
-  onSubmit,
-  isLoading,
-}: SpriteGeneratorFormProps) {
+export default function SpriteGeneratorForm({ onSubmit, isLoading }: SpriteGeneratorFormProps) {
   const [prompt, setPrompt] = useState("");
   const [refImage, setRefImage] = useState<string | null>(null);
 
@@ -28,53 +27,73 @@ export default function SpriteGeneratorForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-[7px] mb-2 tracking-wider">
+    <form onSubmit={handleSubmit}>
+
+      {/* Prompt input */}
+      <div className="mb-6">
+        <label className="fr-label block mb-3">
           DESCRIBE YOUR POKÉMON
         </label>
-        <div className="fr-panel p-0 overflow-hidden">
+        <div className="fr-panel overflow-hidden">
           <textarea
+            className="fr-input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="A small dragon made of molten lava..."
-            rows={3}
+            placeholder="A small dragon made of molten lava, fierce eyes, tiny wings…"
+            rows={4}
             maxLength={500}
             disabled={isLoading}
-            className="w-full p-3 bg-[var(--fr-cream)] text-[var(--fr-border)] text-[7px] leading-relaxed tracking-wide resize-none outline-none font-[inherit] placeholder:text-[var(--fr-gray)] disabled:opacity-60"
           />
         </div>
-        <p className="text-[6px] text-[var(--fr-shadow)] mt-1 text-right">
-          {prompt.length}/500
+        <p className="fr-small fr-muted text-right mt-2">
+          {prompt.length} / 500
         </p>
       </div>
 
-      {/* Example prompt chips */}
-      <div>
-        <p className="text-[6px] text-[var(--fr-shadow)] mb-2 tracking-wider">EXAMPLES</p>
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLE_PROMPTS.map((ex) => (
+      <hr className="fr-divider mb-6" />
+
+      {/* Example chips */}
+      <div className="mb-6">
+        <p className="fr-small fr-muted mb-3">QUICK EXAMPLES</p>
+        <div className="flex flex-wrap gap-3">
+          {EXAMPLES.map((ex) => (
             <button
-              key={ex}
+              key={ex.label}
               type="button"
-              onClick={() => setPrompt(ex)}
+              onClick={() => setPrompt(ex.prompt)}
               disabled={isLoading}
-              className="fr-btn text-[5px] px-2 py-1"
+              className="fr-btn"
+              style={{ fontSize: "var(--fs-xs)", padding: "8px 14px" }}
             >
-              {ex.slice(0, 20)}…
+              {ex.label}
             </button>
           ))}
         </div>
       </div>
 
-      <ImageUpload onImage={setRefImage} />
+      <hr className="fr-divider mb-6" />
 
+      {/* Image upload */}
+      <div className="mb-8">
+        <ImageUpload onImage={setRefImage} />
+      </div>
+
+      {/* Generate button */}
       <button
         type="submit"
         disabled={isLoading || !prompt.trim()}
-        className="fr-btn w-full text-[8px] py-3"
+        className="fr-btn fr-btn-generate"
       >
-        {isLoading ? "Generating…" : "Generate Pokémon"}
+        {isLoading ? (
+          <>
+            <span className="fr-dot-1">.</span>
+            <span className="fr-dot-2">.</span>
+            <span className="fr-dot-3">.</span>
+            &nbsp; GENERATING
+          </>
+        ) : (
+          "▶ GENERATE POKÉMON"
+        )}
       </button>
     </form>
   );

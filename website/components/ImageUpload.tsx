@@ -15,7 +15,6 @@ function resizeImageClientSide(file: File): Promise<string> {
     img.onload = () => {
       const canvas = document.createElement("canvas");
       let { width, height } = img;
-      // Scale down until under MAX_BYTES (rough: 3 bytes/px for PNG)
       const maxPx = Math.sqrt(MAX_BYTES / 3);
       if (width > maxPx || height > maxPx) {
         const scale = maxPx / Math.max(width, height);
@@ -28,8 +27,7 @@ function resizeImageClientSide(file: File): Promise<string> {
       if (!ctx) return reject(new Error("Canvas unavailable"));
       ctx.drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      const dataUrl = canvas.toDataURL("image/png");
-      resolve(dataUrl.replace(/^data:image\/png;base64,/, ""));
+      resolve(canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""));
     };
     img.onerror = () => reject(new Error("Image load failed"));
     img.src = url;
@@ -59,28 +57,35 @@ export default function ImageUpload({ onImage }: ImageUploadProps) {
 
   return (
     <div>
-      <p className="text-[7px] mb-2 tracking-wider text-[var(--fr-shadow)]">
-        REFERENCE IMAGE (optional)
+      <p className="fr-label mb-3" style={{ color: "var(--fr-shadow)" }}>
+        REFERENCE IMAGE
+        <span className="fr-small fr-muted ml-2">(optional)</span>
       </p>
+
       {preview ? (
-        <div className="flex items-center gap-3">
-          <div className="fr-panel p-1">
+        <div className="flex items-center gap-4">
+          <div className="fr-panel p-2 inline-block">
             <img
               src={preview}
               alt="Reference"
-              className="sprite-display w-16 h-16 object-cover"
+              className="sprite-display"
+              style={{ width: 80, height: 80, objectFit: "cover", display: "block" }}
             />
           </div>
-          <button className="fr-btn fr-btn-red text-[6px]" onClick={handleRemove}>
-            Remove
-          </button>
+          <div>
+            <p className="fr-small fr-muted mb-3">Image ready!</p>
+            <button className="fr-btn fr-btn-red" onClick={handleRemove}>
+              Remove
+            </button>
+          </div>
         </div>
       ) : (
         <div
-          className={`fr-panel p-4 text-center cursor-pointer transition-opacity ${
-            dragging ? "opacity-60" : ""
-          }`}
+          role="button"
+          tabIndex={0}
+          className={`fr-panel p-6 text-center cursor-pointer transition-opacity ${dragging ? "opacity-60" : ""}`}
           onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => {
@@ -90,13 +95,11 @@ export default function ImageUpload({ onImage }: ImageUploadProps) {
             if (file) handleFile(file);
           }}
         >
-          <p className="text-[6px] text-[var(--fr-shadow)] leading-relaxed">
-            Drop image here
-            <br />
-            or click to browse
-          </p>
+          <p className="fr-label fr-muted mb-2">[ DROP IMAGE HERE ]</p>
+          <p className="fr-small fr-muted">or press to browse</p>
         </div>
       )}
+
       <input
         ref={inputRef}
         type="file"

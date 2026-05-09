@@ -2,131 +2,259 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── FireRed Colour System ─────────────────────── */
 :root {
-  --fr-navy:   #18204b;
-  --fr-red:    #b81818;
-  --fr-cream:  #f8f8e8;
-  --fr-border: #181818;
-  --fr-shadow: #585858;
-  --fr-white:  #ffffff;
-  --fr-gray:   #a8a8a8;
-  --fr-dark:   #383838;
+  --fr-navy:    #18204b;   /* page / panel-bg-dark */
+  --fr-navy-lt: #2a3a7a;   /* button hover, secondary bg */
+  --fr-red:     #b81818;   /* Pokédex red accent */
+  --fr-red-lt:  #e84040;   /* button top-left inset */
+  --fr-red-dk:  #800000;   /* button bottom-right inset */
+  --fr-cream:   #f8f8e8;   /* panel background */
+  --fr-border:  #181818;   /* outer border, text */
+  --fr-shadow:  #585858;   /* bottom-right inset */
+  --fr-white:   #ffffff;   /* top-left inset highlight */
+  --fr-gray:    #a8a8a8;   /* secondary / placeholder */
+  --fr-blue:    #3050d8;   /* link / emphasis blue */
+
+  /* Typography scale — readable at modern DPI */
+  --fs-xl:   22px;   /* H1, game title */
+  --fs-lg:   16px;   /* H2, panel heading */
+  --fs-md:   13px;   /* labels, button text */
+  --fs-sm:   11px;   /* body, textarea text */
+  --fs-xs:   10px;   /* secondary, counter */
+  --fs-2xs:   9px;   /* footer, badge */
+
+  --letter: 0.04em;
+  --letter-wide: 0.10em;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ── Reset ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
+  margin: 0;
   background-color: var(--fr-navy);
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 16px 16px;
   color: var(--fr-border);
-  font-family: var(--font-pixel), monospace;
+  font-family: var(--font-pixel), 'Courier New', monospace;
+  font-size: var(--fs-sm);
   min-height: 100vh;
 }
 
-/* Authentic FireRed panel border */
+/* ── Authentic FireRed Panel ───────────────────── */
+/* Black outer border + white top-left inset + shadow bottom-right inset */
 .fr-panel {
   background: var(--fr-cream);
   border: 4px solid var(--fr-border);
   box-shadow:
-    inset 2px 2px 0 var(--fr-white),
-    inset -2px -2px 0 var(--fr-shadow);
+    inset  3px  3px 0 var(--fr-white),
+    inset -3px -3px 0 var(--fr-shadow);
+}
+
+.fr-panel-dark {
+  background: var(--fr-navy);
+  border: 4px solid var(--fr-border);
+  box-shadow:
+    inset  3px  3px 0 var(--fr-navy-lt),
+    inset -3px -3px 0 #0a0e26;
 }
 
 .fr-panel-red {
   background: var(--fr-cream);
   border: 4px solid var(--fr-red);
   box-shadow:
-    inset 2px 2px 0 #ff6060,
-    inset -2px -2px 0 #800000;
+    inset  3px  3px 0 var(--fr-red-lt),
+    inset -3px -3px 0 var(--fr-red-dk);
 }
 
 .fr-panel-dialog {
   background: var(--fr-cream);
   border: 4px solid var(--fr-border);
   box-shadow:
-    inset 2px 2px 0 var(--fr-white),
-    inset -2px -2px 0 var(--fr-shadow),
-    4px 4px 0 rgba(0, 0, 0, 0.4);
+    inset  3px  3px 0 var(--fr-white),
+    inset -3px -3px 0 var(--fr-shadow),
+    6px 6px 0 rgba(0,0,0,0.45);
 }
 
+/* ── Buttons ───────────────────────────────────── */
 .fr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: var(--fr-navy);
   color: var(--fr-cream);
   border: 4px solid var(--fr-border);
   box-shadow:
-    inset 2px 2px 0 #4a5699,
-    inset -2px -2px 0 #0a0e26;
-  padding: 10px 20px;
+    inset  3px  3px 0 var(--fr-navy-lt),
+    inset -3px -3px 0 #0a0e26;
+  padding: 12px 20px;
   font-family: inherit;
-  font-size: 8px;
-  letter-spacing: 0.05em;
+  font-size: var(--fs-md);
+  letter-spacing: var(--letter);
   cursor: pointer;
-  transition: filter 0.1s;
   text-transform: uppercase;
+  line-height: 1;
+  transition: filter 80ms ease, transform 80ms ease;
+  white-space: nowrap;
 }
 
 .fr-btn:hover:not(:disabled) {
-  filter: brightness(1.2);
+  filter: brightness(1.25);
 }
 
 .fr-btn:active:not(:disabled) {
   box-shadow:
-    inset -2px -2px 0 #4a5699,
-    inset 2px 2px 0 #0a0e26;
-  transform: translate(1px, 1px);
+    inset -3px -3px 0 var(--fr-navy-lt),
+    inset  3px  3px 0 #0a0e26;
+  transform: translate(2px, 2px);
 }
 
 .fr-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* Red variant */
 .fr-btn-red {
   background: var(--fr-red);
   box-shadow:
-    inset 2px 2px 0 #e84040,
-    inset -2px -2px 0 #800000;
+    inset  3px  3px 0 var(--fr-red-lt),
+    inset -3px -3px 0 var(--fr-red-dk);
 }
 
-/* Sprite display — no browser smoothing */
+/* Full-width generate button — hero treatment */
+.fr-btn-generate {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: var(--fs-lg);
+  background: var(--fr-red);
+  box-shadow:
+    inset  3px  3px 0 var(--fr-red-lt),
+    inset -3px -3px 0 var(--fr-red-dk);
+}
+
+/* ── Typography helpers ────────────────────────── */
+.fr-title   { font-size: var(--fs-xl);  letter-spacing: var(--letter-wide); line-height: 1.4; }
+.fr-heading { font-size: var(--fs-lg);  letter-spacing: var(--letter-wide); line-height: 1.4; }
+.fr-label   { font-size: var(--fs-md);  letter-spacing: var(--letter-wide); line-height: 1.6; }
+.fr-body    { font-size: var(--fs-sm);  letter-spacing: var(--letter);      line-height: 1.8; }
+.fr-small   { font-size: var(--fs-xs);  letter-spacing: var(--letter);      line-height: 1.6; }
+.fr-tiny    { font-size: var(--fs-2xs); letter-spacing: var(--letter);      line-height: 1.6; }
+
+.fr-muted   { color: var(--fr-shadow); }
+.fr-red-txt { color: var(--fr-red); }
+
+/* ── FireRed cursor ▶ ──────────────────────────── */
+.fr-cursor::before {
+  content: "▶";
+  margin-right: 8px;
+  color: var(--fr-border);
+  display: inline-block;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Section divider ───────────────────────────── */
+.fr-divider {
+  border: none;
+  border-top: 3px solid var(--fr-border);
+  box-shadow: 0 2px 0 var(--fr-white);
+  margin: 0;
+}
+
+/* ── Sprite rendering ──────────────────────────── */
 .sprite-display {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
 
-/* Loading dots animation */
-@keyframes dot-blink {
-  0%, 100% { opacity: 1; }
-  33%       { opacity: 0; }
-  66%       { opacity: 0; }
+/* ── Input / textarea ──────────────────────────── */
+.fr-input {
+  width: 100%;
+  background: var(--fr-cream);
+  color: var(--fr-border);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--letter);
+  line-height: 1.8;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 12px 14px;
 }
-@keyframes dot-blink-2 {
-  0%, 33%   { opacity: 0; }
+
+.fr-input::placeholder { color: var(--fr-gray); }
+.fr-input:disabled { opacity: 0.55; }
+
+/* ── Loading animation ─────────────────────────── */
+@keyframes fr-dot {
+  0%,  49% { opacity: 0; }
   50%, 100% { opacity: 1; }
-  85%       { opacity: 0; }
-}
-@keyframes dot-blink-3 {
-  0%, 55%   { opacity: 0; }
-  70%, 100% { opacity: 1; }
 }
 
-.loading-dot-1 { animation: dot-blink 1.2s infinite; }
-.loading-dot-2 { animation: dot-blink-2 1.2s infinite; }
-.loading-dot-3 { animation: dot-blink-3 1.2s infinite; }
+.fr-dot-1 { animation: fr-dot 1.2s 0.0s infinite; }
+.fr-dot-2 { animation: fr-dot 1.2s 0.4s infinite; }
+.fr-dot-3 { animation: fr-dot 1.2s 0.8s infinite; }
 
-/* Scanline overlay for GBA feel */
-.scanlines::after {
+/* HP bar fill animation */
+@keyframes hp-fill {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+.fr-loading-bar {
+  height: 10px;
+  background: #58c840;
+  animation: hp-fill 4s ease-out forwards, hp-color 4s ease-out forwards;
+}
+
+@keyframes hp-color {
+  0%, 49%  { background: #58c840; }  /* green  */
+  50%, 74% { background: #f8b800; }  /* yellow */
+  75%, 100%{ background: #f83800; }  /* red    */
+}
+
+/* ── Scanline overlay (subtle) ─────────────────── */
+.fr-scanlines {
+  position: relative;
+}
+
+.fr-scanlines::after {
   content: "";
   position: absolute;
   inset: 0;
   background: repeating-linear-gradient(
     0deg,
     transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.04) 2px,
-    rgba(0, 0, 0, 0.04) 4px
+    transparent 3px,
+    rgba(0,0,0,0.035) 3px,
+    rgba(0,0,0,0.035) 4px
   );
   pointer-events: none;
-  z-index: 1;
+  z-index: 10;
 }
+
+/* ── Page-load stagger ─────────────────────────── */
+@keyframes fr-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fr-appear {
+  animation: fr-enter 0.3s ease both;
+}
+
+.fr-appear-1 { animation-delay: 0.05s; }
+.fr-appear-2 { animation-delay: 0.10s; }
+.fr-appear-3 { animation-delay: 0.15s; }
+.fr-appear-4 { animation-delay: 0.20s; }
+.fr-appear-5 { animation-delay: 0.25s; }

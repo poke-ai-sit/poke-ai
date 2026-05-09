@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 
-type Variant = "default" | "red" | "dialog";
+type Variant = "default" | "red" | "dialog" | "dark";
 
 interface FireRedPanelProps {
   children: ReactNode;
@@ -12,8 +12,9 @@ interface FireRedPanelProps {
 
 const variantClass: Record<Variant, string> = {
   default: "fr-panel",
-  red: "fr-panel-red",
-  dialog: "fr-panel-dialog",
+  red:     "fr-panel-red",
+  dialog:  "fr-panel-dialog",
+  dark:    "fr-panel-dark",
 };
 
 export default function FireRedPanel({
