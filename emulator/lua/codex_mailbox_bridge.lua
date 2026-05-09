@@ -460,17 +460,84 @@ local function extract_json_string_array(response, field_name)
   return out
 end
 
+-- Parses the bridge's `party_override` field into a list of {species, level,
+-- moves[4]} tables. The JSON shape is:
+--   "party_override":[{"species":4,"level":5,"moves":[10,45,52,0]}, ...]
+-- Returns nil if the field is missing/null/empty. Walks brackets manually so
+-- the outer array's match doesn't get cut short by the inner moves array.
+local function parse_party_override(response)
+  local key_pos = response:find('"party_override"%s*:%s*')
+  if not key_pos then return nil end
+  -- Bail if the field is null.
+  local null_check = response:sub(key_pos, key_pos + 60)
+  if null_check:match('"party_override"%s*:%s*null') then return nil end
+  local open_idx = response:find('%[', key_pos)
+  if not open_idx then return nil end
+
+  local depth = 1
+  local i = open_idx + 1
+  local len = #response
+  while i <= len and depth > 0 do
+    local c = response:sub(i, i)
+    if c == '[' then
+      depth = depth + 1
+    elseif c == ']' then
+      depth = depth - 1
+      if depth == 0 then break end
+    end
+    i = i + 1
+  end
+  if depth ~= 0 then return nil end
+
+  local body = response:sub(open_idx + 1, i - 1)
+  if body:match("^%s*$") then return nil end
+
+  local slots = {}
+  for obj in body:gmatch("{(.-)}") do
+    local species = tonumber(obj:match('"species"%s*:%s*(%-?%d+)'))
+    local level = tonumber(obj:match('"level"%s*:%s*(%-?%d+)'))
+    local moves_str = obj:match('"moves"%s*:%s*%[(.-)%]')
+    local moves = {0, 0, 0, 0}
+    if moves_str then
+      local k = 1
+      for m in moves_str:gmatch("(%-?%d+)") do
+        if k <= 4 then moves[k] = tonumber(m) end
+        k = k + 1
+      end
+    end
+    if species and level then
+      slots[#slots + 1] = {species = species, level = level, moves = moves}
+    end
+  end
+  if #slots == 0 then return nil end
+  return slots
+end
+
 -- gRivalAIBuffer layout (matches struct in include/pokelive_rival_ai.h):
---   off 0..3  : u32 magic
---   off 4     : u8  active        (1 = plan loaded; C hook clears to 0 after first turn)
---   off 5..8  : s8  moveScore[4]
---   off 9     : u8  counterChoice
+--   off  0..3 : u32 magic
+--   off  4    : u8  active             (1 = plan loaded; C hook clears to 0 after first turn)
+--   off  5..8 : s8  moveScore[4]
+--   off  9    : u8  counterChoice
 --   off 10    : u8  resultPending
---   off 11    : u8  pad
-local RIVAL_AI_OFF_ACTIVE          = 4
-local RIVAL_AI_OFF_MOVE_SCORE      = 5
-local RIVAL_AI_OFF_COUNTER_CHOICE  = 9
-local RIVAL_AI_OFF_RESULT_PENDING  = 10
+--   off 11    : u8  partyOverrideCount (0 = no override; 1..6 = use partyOverride)
+--   off 12..13: u8  pad[2]
+--   off 14..  : struct PokeliveRivalPartySlot partyOverride[6]
+--                each slot is 12 bytes:
+--                  +0  u16 species
+--                  +2  u8  level
+--                  +3  u8  pad
+--                  +4  u16 moves[4]
+local RIVAL_AI_OFF_ACTIVE                = 4
+local RIVAL_AI_OFF_MOVE_SCORE            = 5
+local RIVAL_AI_OFF_COUNTER_CHOICE        = 9
+local RIVAL_AI_OFF_RESULT_PENDING        = 10
+local RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT  = 11
+local RIVAL_AI_OFF_PARTY_OVERRIDE_BASE   = 14
+local RIVAL_AI_PARTY_SLOT_STRIDE         = 12
+local RIVAL_AI_PARTY_SLOT_OFF_SPECIES    = 0
+local RIVAL_AI_PARTY_SLOT_OFF_LEVEL      = 2
+local RIVAL_AI_PARTY_SLOT_OFF_MOVES      = 4
+local RIVAL_AI_PARTY_OVERRIDE_MAX        = 6
 
 -- Writes a Smart-Gary AI plan into gRivalAIBuffer. Order matters:
 --   1. magic + counterChoice + moveScore[0..3]   (clamped, negatives → two's complement)
@@ -855,6 +922,49 @@ local function write_counter_choice_only(counter_choice)
   emu:write32(RIVAL_AI_BUFFER_ADDR, RIVAL_AI_BUFFER_MAGIC)
   emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_COUNTER_CHOICE, counter_choice or 0)
   return true
+end
+
+-- Sprint-007 RUNTIME RIVAL PARTY OVERRIDE.
+--
+-- Writes the bridge-emitted party slots into gRivalAIBuffer.partyOverride
+-- and bumps gRivalAIBuffer.partyOverrideCount. ApplyPokeliveRivalPartyOverride
+-- in battle_main.c picks this up at trainerbattle setup and rebuilds
+-- gEnemyParty from these fields, so a single base trainer can host any
+-- AI-picked counter team without burning trainer IDs.
+--
+-- Order: write magic + slot fields FIRST, then partyOverrideCount LAST so
+-- a partially-written struct is never observed by the C hook (the hook
+-- only fires when count > 0).
+local function write_party_override(slots)
+  if RIVAL_AI_BUFFER_ADDR == 0 then return false, "RIVAL_AI_BUFFER_ADDR unset" end
+  if not slots or #slots == 0 then
+    -- Clear any previously-written override so the next battle uses the
+    -- static base party.
+    emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT, 0)
+    return true, "cleared"
+  end
+
+  emu:write32(RIVAL_AI_BUFFER_ADDR, RIVAL_AI_BUFFER_MAGIC)
+
+  local count = math.min(#slots, RIVAL_AI_PARTY_OVERRIDE_MAX)
+  for i = 1, count do
+    local slot = slots[i]
+    local base = RIVAL_AI_BUFFER_ADDR
+                 + RIVAL_AI_OFF_PARTY_OVERRIDE_BASE
+                 + (i - 1) * RIVAL_AI_PARTY_SLOT_STRIDE
+    emu:write16(base + RIVAL_AI_PARTY_SLOT_OFF_SPECIES, slot.species or 0)
+    emu:write8 (base + RIVAL_AI_PARTY_SLOT_OFF_LEVEL,   slot.level or 1)
+    for j = 1, 4 do
+      emu:write16(
+        base + RIVAL_AI_PARTY_SLOT_OFF_MOVES + (j - 1) * 2,
+        (slot.moves and slot.moves[j]) or 0
+      )
+    end
+  end
+
+  -- Arm LAST — C hook only triggers once this byte goes non-zero.
+  emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT, count)
+  return true, count
 end
 
 -- ---------------------------------------------------------------------------
@@ -1508,6 +1618,34 @@ local function poll_pending_response()
           write_line("counter_choice write failed: " .. tostring(reason_cc))
         end
       end
+      -- Sprint-007 — runtime party override. The bridge composes a fresh
+      -- (species, level, moves) per slot based on the player's current party
+      -- and we write those straight into gRivalAIBuffer.partyOverride. The
+      -- C-side hook in CreateNPCTrainerParty rebuilds gEnemyParty from these
+      -- fields at battle setup, so the dispatched base trainer's static
+      -- party is irrelevant — every encounter is composed live.
+      local party_override = parse_party_override(response)
+      if party_override then
+        local ok_po, info_po = write_party_override(party_override)
+        if ok_po then
+          local parts = {}
+          for i, slot in ipairs(party_override) do
+            parts[#parts + 1] = string.format(
+              "[%d]sp=%d lv=%d", i, slot.species, slot.level
+            )
+          end
+          write_line(string.format(
+            "Rival party override armed (%d slots): %s",
+            info_po, table.concat(parts, " ")
+          ))
+        else
+          write_line("party override write failed: " .. tostring(info_po))
+        end
+      else
+        -- No override in response — make sure stale data from a previous
+        -- encounter doesn't leak into the next battle.
+        write_party_override(nil)
+      end
       -- Pokegear-style call pages — populated only for first_capture and
       -- second_capture triggers. Each page goes into its own EWRAM slot in
       -- gRivalEncounterBuffer.callPages so the ROM cinematic script can msgbox
@@ -1644,6 +1782,12 @@ local function maybe_reset_rival_memory()
   local save_block_1 = emu:read32(SAVE_BLOCK_1_PTR)
   if save_block_1 == 0 or save_block_1 == 0xFFFFFFFF then return end
   memory_reset_state = "in_flight"
+  -- Sprint-007 — clear any stale partyOverrideCount left over from a save
+  -- state restore so the next non-rival trainer battle (e.g. Brock) doesn't
+  -- accidentally inherit the rival's override and crash the load.
+  if RIVAL_AI_BUFFER_ADDR ~= 0 then
+    emu:write8(RIVAL_AI_BUFFER_ADDR + RIVAL_AI_OFF_PARTY_OVERRIDE_COUNT, 0)
+  end
   local _, err = post_rival_memory_reset()
   if err then
     write_line("rival-memory-reset POST failed: " .. tostring(err))

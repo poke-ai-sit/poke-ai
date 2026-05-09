@@ -15,6 +15,7 @@ from pokelive_bridge.pokemon_text import sanitize_dialog_text
 from pokelive_bridge.rival_counter import (
     battle_index_for_trigger,
     pick_counter_choice,
+    pick_rival_party,
 )
 
 
@@ -328,10 +329,20 @@ def rival_react(
     counter_choice: int | None = None
     counter_label: str | None = None
     call_pages: list[str] | None = None
+    party_override: list[dict[str, Any]] | None = None
 
     if trigger in _BATTLE_SETUP_TRIGGERS:
         battle_index = battle_index_for_trigger(trigger)
         counter_choice, counter_label = pick_counter_choice(party, battle_index)
+        # Sprint-007 — runtime party construction. The picker emits explicit
+        # (species, level, moves) tuples per slot; Lua writes them straight
+        # into gRivalAIBuffer.partyOverride so the C-side hook can rebuild
+        # gEnemyParty at battle setup. The legacy counter_choice index above
+        # still routes the script to *some* base trainer, but its static
+        # party gets overwritten before the first turn.
+        party_override = [
+            slot.to_dict() for slot in pick_rival_party(party, battle_index)
+        ]
         sanitized, call_pages = _generate_pokegear_response(
             trigger, game_state, party, details, counter_label, rival_name,
         )
@@ -379,6 +390,7 @@ def rival_react(
         "call_pages": call_pages,
         "counter_choice": counter_choice,
         "counter_label": counter_label,
+        "party_override": party_override,
     }
 
 

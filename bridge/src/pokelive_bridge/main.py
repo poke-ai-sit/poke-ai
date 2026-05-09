@@ -97,6 +97,13 @@ class RivalEventResponse(BaseModel):
     # via BufferRivalCallNextPage. None for non-battle-setup triggers.
     call_pages: list[str] | None = None
     call_pages_hex: list[str] | None = None
+    # Sprint-007 runtime party override. Each slot is {species, level,
+    # moves: [m0,m1,m2,m3]}. Lua writes these straight into
+    # gRivalAIBuffer.partyOverride; the C-side hook in CreateNPCTrainerParty
+    # then rebuilds gEnemyParty from them, replacing whatever the
+    # dispatched base trainer's static party held. None for non-battle
+    # triggers.
+    party_override: list[dict[str, Any]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +284,7 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
         counter_label=result.get("counter_label"),
         call_pages=call_pages,
         call_pages_hex=call_pages_hex,
+        party_override=result.get("party_override"),
     )
 
 

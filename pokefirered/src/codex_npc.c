@@ -344,3 +344,55 @@ void EvolveCustomPokemon(void)
     }
     gSpecialVar_Result = FALSE;
 }
+
+/* Sprint-007 RUNTIME RIVAL PARTY OVERRIDE.
+ *
+ * Materialises gEnemyParty[] from the bridge-supplied gRivalAIBuffer
+ * partyOverride slots. Called from CreateNPCTrainerParty in battle_main.c
+ * AFTER the standard static party load runs, so even a single 1-mon base
+ * trainer can host any 1-6 mon dynamic team the bridge picks. The override
+ * is consumed (count zeroed) so a follow-up battle (e.g. Brock right after)
+ * doesn't reuse stale data.
+ *
+ * Mon construction mirrors the F_TRAINER_PARTY_CUSTOM_MOVESET branch:
+ * CreateMon for species/level/IVs/personality, then SetMonData per move
+ * slot to lock the moves and refresh PP. */
+void ApplyPokeliveRivalPartyOverride(struct Pokemon *party)
+{
+    u8 count;
+    u8 i, j;
+    struct PokeliveRivalPartySlot *slot;
+
+    if (gRivalAIBuffer.partyOverrideCount == 0)
+        return;
+
+    count = gRivalAIBuffer.partyOverrideCount;
+    if (count > POKELIVE_RIVAL_OVERRIDE_MAX)
+        count = POKELIVE_RIVAL_OVERRIDE_MAX;
+    if (count > PARTY_SIZE)
+        count = PARTY_SIZE;
+
+    /* Wipe whatever the static base trainer wrote, then reconstruct from
+     * the bridge override. CalculateEnemyPartyCount() walks gEnemyParty
+     * looking for SPECIES_NONE so the trailing slots will be ignored. */
+    ZeroEnemyPartyMons();
+
+    for (i = 0; i < count; i++)
+    {
+        slot = &gRivalAIBuffer.partyOverride[i];
+        if (slot->species == SPECIES_NONE)
+            continue;
+
+        CreateMon(&party[i], slot->species, slot->level, 100,
+                  TRUE, 0x88, OT_ID_RANDOM_NO_SHINY, 0);
+
+        for (j = 0; j < MAX_MON_MOVES; j++)
+        {
+            SetMonData(&party[i], MON_DATA_MOVE1 + j, &slot->moves[j]);
+            SetMonData(&party[i], MON_DATA_PP1 + j,
+                       &gBattleMoves[slot->moves[j]].pp);
+        }
+    }
+
+    gRivalAIBuffer.partyOverrideCount = 0;
+}
