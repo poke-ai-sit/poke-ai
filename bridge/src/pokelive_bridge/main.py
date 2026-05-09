@@ -133,6 +133,7 @@ class RivalBattlePlanResponse(BaseModel):
     opening_taunt: str
     opening_taunt_hex: str
     strategy_summary: str
+    reasoning_trace: list[str] = []  # step-by-step reasoning shown to audience
 
 
 class RivalTauntRequest(BaseModel):
@@ -165,6 +166,7 @@ class RivalBattleSummaryResponse(BaseModel):
 
 app = FastAPI(title="PokéLive Bridge")
 latest_game_state: GameStateRequest | None = None
+latest_rival_plan: RivalBattlePlanResponse | None = None
 
 
 @app.get("/health")
@@ -263,10 +265,18 @@ def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
     )
 
 
+@app.get("/rival-latest-plan")
+def get_rival_latest_plan() -> RivalBattlePlanResponse:
+    """Return the most recent battle plan (for the website thinking panel)."""
+    if latest_rival_plan is None:
+        raise HTTPException(status_code=404, detail="No battle plan has been generated yet.")
+    return latest_rival_plan
+
+
 @app.post("/rival-battle-plan")
 def post_rival_battle_plan(req: RivalBattlePlanRequest) -> RivalBattlePlanResponse:
     """Pre-battle: GPT reads memory + opponent + outputs counter + score boosts + opening line."""
-    global latest_game_state
+    global latest_game_state, latest_rival_plan
     if req.game_state is not None:
         latest_game_state = req.game_state
 
@@ -279,13 +289,16 @@ def post_rival_battle_plan(req: RivalBattlePlanRequest) -> RivalBattlePlanRespon
     )
 
     opening = plan["opening_taunt"]
-    return RivalBattlePlanResponse(
+    response = RivalBattlePlanResponse(
         counter_choice=plan["counter_choice"],
         move_scores=plan["move_scores"],
         opening_taunt=opening,
         opening_taunt_hex=format_dialog_hex(opening, chars_per_line=200, lines_per_page=1),
         strategy_summary=plan["strategy_summary"],
+        reasoning_trace=plan.get("reasoning_steps", []),
     )
+    latest_rival_plan = response
+    return response
 
 
 @app.post("/rival-taunt")
