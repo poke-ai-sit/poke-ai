@@ -1094,6 +1094,12 @@ local function check_battle_transitions()
         if #battle_log > 0 then
           post_rival_battle_summary(current_battle_id, outcome_label, battle_log, nil)
         end
+      else
+        -- Untracked battle (wild / random trainer): print one boundary line.
+        write_line(string.format(
+          "BATTLE END: id=<untracked> outcome=%d label=%s",
+          outcome, outcome_label
+        ))
       end
 
       -- BATTLE_OUTCOME_CAUGHT (=7) is the canonical "player caught a wild
@@ -1106,6 +1112,12 @@ local function check_battle_transitions()
       if outcome == BATTLE_OUTCOME_CAUGHT then
         local pc = read_party_count()
         local post_state = read_game_state()
+        write_line(string.format(
+          "CAUGHT detected: party_count=%s state=%s first_capture_state=%s second_capture_state=%s",
+          tostring(pc),
+          post_state and "ok" or "nil",
+          first_capture_state, second_capture_state
+        ))
         if pc and post_state then
           local capture_map_sig = string.format(
             "%d:%d", post_state.map_group, post_state.map_num
@@ -1173,15 +1185,17 @@ local function check_battle_transitions()
       end
     end
     if not current_battle_id then
-      -- Battle is real but it's a wild encounter or random trainer fight, not
-      -- one of our scripted rival battles. Mark in_battle so exit detection
-      -- still releases the post-catch trigger, but suppress every log line
-      -- (BATTLE START, per-turn move log, BATTLE END) because the demo only
-      -- cares about player-vs-rival fights. battle_log stays empty so the
-      -- mid-battle move loop has nothing to append into either.
+      -- Wild encounter or random trainer — not a scripted rival battle.
+      -- Print ONLY the boundary markers (START/END) so the operator can see
+      -- the watcher noticed; suppress per-turn move spam (battle_log stays
+      -- empty so the mid-battle loop has nothing to append).
       in_battle = true
       current_turn = 1
       battle_log = {}
+      write_line(string.format(
+        "BATTLE START: id=<untracked> map=%s (move log suppressed)",
+        tostring(sig)
+      ))
       return
     end
 
