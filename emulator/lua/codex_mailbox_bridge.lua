@@ -1166,6 +1166,15 @@ local function check_rival_triggers()
   local state = read_game_state()
   if not state then return end
 
+  -- CRITICAL: skip every party-count and position update while the player is
+  -- mid-battle. Catching a wild Pokemon happens DURING the battle (party
+  -- 1 → 2 transitions while the catch animation plays). If we tracked it
+  -- live, last_party_count would already equal 2 by the time the battle
+  -- ends, and the post-exit frame would see no delta — first_capture never
+  -- fires. By skipping the update here, the 1 → 2 jump first becomes
+  -- visible the frame the battle exits, which is exactly when we want it.
+  if in_battle then return end
+
   local map_sig = string.format("%d:%d", state.map_group, state.map_num)
   local position_sig = string.format("%d:%d:%d:%d",
     state.map_group, state.map_num, state.x, state.y)
