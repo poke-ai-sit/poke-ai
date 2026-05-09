@@ -16,7 +16,7 @@ Route2_EventScript_AIRivalEncounter::
 	lockall
 	call EventScript_AIRivalPhoneCall
 	getplayerxy VAR_0x8004, VAR_0x8005
-	addvar VAR_0x8004, 2
+	addvar VAR_0x8004, 5
 	setobjectxyperm LOCALID_ROUTE2_AI_RIVAL, VAR_0x8004, VAR_0x8005
 	setobjectmovementtype LOCALID_ROUTE2_AI_RIVAL, MOVEMENT_TYPE_FACE_LEFT
 	playse SE_WARP_IN
@@ -31,6 +31,9 @@ Route2_EventScript_AIRivalEncounter::
 	end
 
 Route2_Movement_AIRivalApproach::
+	walk_left
+	walk_left
+	walk_left
 	walk_left
 	step_end
 

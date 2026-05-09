@@ -20,7 +20,7 @@ PewterCity_Gym_EventScript_AIRivalEncounter::
 	lockall
 	call EventScript_AIRivalPhoneCall
 	getplayerxy VAR_0x8004, VAR_0x8005
-	addvar VAR_0x8005, 2
+	addvar VAR_0x8005, 5
 	setobjectxyperm LOCALID_PEWTER_GYM_AI_RIVAL, VAR_0x8004, VAR_0x8005
 	setobjectmovementtype LOCALID_PEWTER_GYM_AI_RIVAL, MOVEMENT_TYPE_FACE_UP
 	playse SE_WARP_IN
@@ -35,6 +35,9 @@ PewterCity_Gym_EventScript_AIRivalEncounter::
 	end
 
 PewterCity_Gym_Movement_AIRivalApproach::
+	walk_up
+	walk_up
+	walk_up
 	walk_up
 	step_end
 

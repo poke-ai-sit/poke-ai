@@ -1,48 +1,40 @@
 """Counter-choice picker for Smart Gary's Battle 2 / Battle 3 setup.
 
-The picker is intentionally hard-coded and offline — no PokéAPI calls at
-runtime. Given a player's party, it identifies a primary type (the type of
-the highest-level party member) and maps that to one of six bucket choices.
+Per-slot counter logic:
+  rival slot 0 counters player slot 0 (the starter)
+  rival slot 1 counters player slot 1 (the latest caught Pokemon)
+  rival slot 2 (B3 only) is a complementary mon
 
-counterChoice ID assignments (gRivalAIBuffer.counterChoice u8):
-  Battle 2 (low level, 7-9):
-    0 = anti-fire   (player's strongest mon is fire)
-    1 = anti-water  (player's strongest mon is water)
-    2 = anti-grass  (player's strongest mon is grass)
-    3 = anti-flying (player has heavy flying — Pidgey/Spearow dominant)
-    4 = anti-bug    (player has bug-heavy team — Caterpie/Weedle dominant)
-    5 = balanced    (no clear lead / mixed)
-  Battle 3 (mid level, 11-13): same scheme, +6 offset
-    6  = anti-fire
-    7  = anti-water
-    8  = anti-grass
-    9  = anti-flying
-    10 = anti-bug
-    11 = balanced
+Encoding (gRivalAIBuffer.counterChoice u8):
+  counter_choice = starter_idx * 3 + caught_idx [+ 9 if Battle 3]
+
+  starter_idx is the RIVAL's starter (the counter to player's starter):
+    0 = rival CHARMANDER  (player picked Bulbasaur, grass)
+    1 = rival SQUIRTLE    (player picked Charmander, fire)
+    2 = rival BULBASAUR   (player picked Squirtle, water)
+
+  caught_idx is the bucket for player's latest caught:
+    0 = anti-Flying  (player has Pidgey, Spearow, Zubat, ...)
+    1 = anti-Normal  (player has Rattata, Meowth, Doduo, ...)
+    2 = Default      (anything else, including no second mon)
+
+  B2 range: 0..8.   B3 range: 9..17.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Species → primary (Gen 1) type. Only species realistically catchable on
-# Routes 1/2/22 + Viridian Forest + early dungeons before Pewter are mapped
-# in detail; everything else falls through to None and the picker returns
-# "balanced".
-# ---------------------------------------------------------------------------
+# Species → primary (Gen 1) type. Keep tight — we only need to bucket the
+# species the player can realistically have on the demo path before Pewter.
 SPECIES_PRIMARY_TYPE: dict[int, str] = {
-    # Starters
     1: "Grass", 2: "Grass", 3: "Grass",          # Bulbasaur line
     4: "Fire", 5: "Fire", 6: "Fire",             # Charmander line
     7: "Water", 8: "Water", 9: "Water",          # Squirtle line
-    # Bug — Viridian Forest staples
     10: "Bug", 11: "Bug", 12: "Bug",             # Caterpie line
     13: "Bug", 14: "Bug", 15: "Bug",             # Weedle line
-    # Flying — Route 1/2 staples
-    16: "Flying", 17: "Flying", 18: "Flying",    # Pidgey line (Normal/Flying — Flying primary for our purposes)
+    16: "Flying", 17: "Flying", 18: "Flying",    # Pidgey line
     21: "Flying", 22: "Flying",                  # Spearow line
-    # Other early-route critters (mostly Normal/Poison; map for completeness)
     19: "Normal", 20: "Normal",                  # Rattata line
     23: "Poison", 24: "Poison",                  # Ekans line
     25: "Electric", 26: "Electric",              # Pikachu line
@@ -62,14 +54,14 @@ SPECIES_PRIMARY_TYPE: dict[int, str] = {
     56: "Fighting", 57: "Fighting",              # Mankey line
     58: "Fire", 59: "Fire",                      # Growlithe line
     60: "Water", 61: "Water", 62: "Water",       # Poliwag line
-    66: "Fighting", 67: "Fighting", 68: "Fighting",  # Machop line
-    69: "Grass", 70: "Grass", 71: "Grass",       # Bellsprout line
+    66: "Fighting", 67: "Fighting", 68: "Fighting",
+    69: "Grass", 70: "Grass", 71: "Grass",
     74: "Rock", 75: "Rock", 76: "Rock",          # Geodude line
     77: "Fire", 78: "Fire",                      # Ponyta line
     79: "Water", 80: "Water",                    # Slowpoke line
     81: "Electric", 82: "Electric",              # Magnemite line
     84: "Normal", 85: "Normal",                  # Doduo line
-    92: "Ghost", 93: "Ghost", 94: "Ghost",       # Gastly line
+    92: "Ghost", 93: "Ghost", 94: "Ghost",
     95: "Rock",                                  # Onix
     100: "Electric", 101: "Electric",            # Voltorb line
     104: "Ground", 105: "Ground",                # Cubone line
@@ -77,43 +69,42 @@ SPECIES_PRIMARY_TYPE: dict[int, str] = {
     129: "Water", 130: "Water",                  # Magikarp / Gyarados
 }
 
-# The five "anti-X" bucket types (in counter-choice ID order).
-_BUCKETS_BATTLE_2 = {
-    "Fire": 0,
-    "Water": 1,
-    "Grass": 2,
-    "Flying": 3,
-    "Bug": 4,
+# Which rival starter counters which player starter type?
+#   player Grass  -> rival Charmander (Fire beats Grass)         starter_idx 0
+#   player Fire   -> rival Squirtle   (Water beats Fire)         starter_idx 1
+#   player Water  -> rival Bulbasaur  (Grass beats Water)        starter_idx 2
+_STARTER_COUNTER_IDX: dict[str, int] = {
+    "Grass":  0,
+    "Fire":   1,
+    "Water":  2,
 }
-_BALANCED_BATTLE_2 = 5
-_BATTLE_3_OFFSET = 6
+
+# Default starter_idx when player's starter type is unknown — pick rival
+# Charmander (most demo-friendly: visible fire animations).
+_DEFAULT_STARTER_IDX = 0
+
+# Caught-bucket mapping for slot 1.
+_CAUGHT_BUCKET: dict[str, int] = {
+    "Flying":   0,
+    "Normal":   1,
+    # Everything else (Bug, Poison, Electric, Rock, Fire, Water, Grass, Fighting,
+    # Ground, Ghost) falls through to the "Default" bucket.
+}
+_DEFAULT_CAUGHT_IDX = 2
+
+_BATTLE_3_OFFSET = 9
 
 
-def primary_type_of_party(party: list[Any] | None) -> str | None:
-    """Return the type of the highest-level party member, or None if unknown.
-
-    Tie-break on level: pick the first mon at that level (Lua sends slot order).
-    Falls back to None if every member's species isn't in SPECIES_PRIMARY_TYPE.
-    """
-    if not party:
+def _species_type(species: int | None) -> str | None:
+    if species is None:
         return None
+    return SPECIES_PRIMARY_TYPE.get(int(species))
 
-    # Find the highest level member that has a known type.
-    best_level = -1
-    best_type: str | None = None
-    for entry in party:
-        species = getattr(entry, "species", None)
-        if species is None:
-            continue
-        ptype = SPECIES_PRIMARY_TYPE.get(int(species))
-        if ptype is None:
-            continue
-        level = int(getattr(entry, "level", 0) or 0)
-        if level > best_level:
-            best_level = level
-            best_type = ptype
 
-    return best_type
+def _label_for(starter_idx: int, caught_idx: int, battle_index: int) -> str:
+    starter_names = {0: "rival-Char", 1: "rival-Squirt", 2: "rival-Bulba"}
+    caught_names = {0: "anti-Flying", 1: "anti-Normal", 2: "default"}
+    return f"B{battle_index} {starter_names[starter_idx]} + {caught_names[caught_idx]}"
 
 
 def pick_counter_choice(
@@ -122,31 +113,30 @@ def pick_counter_choice(
 ) -> tuple[int, str]:
     """Pick a counter-choice ID for the given battle (2 or 3).
 
-    Returns a tuple of (counter_choice_id, label).
-      - id is in [0..5] for battle 2, [6..11] for battle 3.
-      - label is a short human-readable bucket name like "anti-fire".
+    Inspects party[0] (player starter) to pick the rival's starter counter,
+    and party[1] (latest caught) to pick the slot-1 counter bucket.
     """
-    primary = primary_type_of_party(party)
+    starter_idx = _DEFAULT_STARTER_IDX
+    caught_idx = _DEFAULT_CAUGHT_IDX
 
-    if primary in _BUCKETS_BATTLE_2:
-        bucket_id = _BUCKETS_BATTLE_2[primary]
-        label = f"anti-{primary.lower()}"
-    else:
-        bucket_id = _BALANCED_BATTLE_2
-        label = "balanced"
+    if party:
+        starter_type = _species_type(getattr(party[0], "species", None))
+        if starter_type and starter_type in _STARTER_COUNTER_IDX:
+            starter_idx = _STARTER_COUNTER_IDX[starter_type]
 
+        if len(party) >= 2:
+            caught_type = _species_type(getattr(party[1], "species", None))
+            if caught_type and caught_type in _CAUGHT_BUCKET:
+                caught_idx = _CAUGHT_BUCKET[caught_type]
+
+    base = starter_idx * 3 + caught_idx
     if battle_index == 3:
-        return (bucket_id + _BATTLE_3_OFFSET, label)
-    # Default / battle_index == 2
-    return (bucket_id, label)
+        base += _BATTLE_3_OFFSET
+
+    return base, _label_for(starter_idx, caught_idx, battle_index)
 
 
 def battle_index_for_trigger(trigger: str) -> int:
-    """Map a /rival-event trigger to its corresponding battle index (2 or 3).
-
-    Returns 0 for triggers that don't map to a battle setup (caller should
-    treat the picker output as ignorable in that case).
-    """
     if trigger == "first_capture":
         return 2
     if trigger == "second_capture":

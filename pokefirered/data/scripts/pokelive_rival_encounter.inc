@@ -36,70 +36,88 @@ EventScript_AIRivalPhoneCall::
 @ Reads gRivalAIBuffer.counterChoice → VAR_RESULT (0..11) and runs the
 @ matching trainer battle. Falls through to balanced variants on any
 @ unexpected value so the cinematic never hangs.
+@ counter_choice encoding (0..17):
+@   counter_choice = starter_idx (0..2) * 3 + caught_idx (0..2)
+@   starter_idx: 0=rival CHAR (player Bulba), 1=rival SQUIRT (player Char), 2=rival BULBA (player Squirt)
+@   caught_idx:  0=anti-Flying, 1=anti-Normal, 2=Default (mixed)
+@   B2 = 0..8, B3 = 9..17
 EventScript_AIRivalDispatchTrainerBattle::
 	special GetAIRivalCounterChoice
 	switch VAR_RESULT
-	case 0,  EventScript_AIRivalBattleB2AntiFire
-	case 1,  EventScript_AIRivalBattleB2AntiWater
-	case 2,  EventScript_AIRivalBattleB2AntiGrass
-	case 3,  EventScript_AIRivalBattleB2AntiFlying
-	case 4,  EventScript_AIRivalBattleB2AntiBug
-	case 5,  EventScript_AIRivalBattleB2Balanced
-	case 6,  EventScript_AIRivalBattleB3AntiFire
-	case 7,  EventScript_AIRivalBattleB3AntiWater
-	case 8,  EventScript_AIRivalBattleB3AntiGrass
-	case 9,  EventScript_AIRivalBattleB3AntiFlying
-	case 10, EventScript_AIRivalBattleB3AntiBug
-	case 11, EventScript_AIRivalBattleB3Balanced
-	@ Fallback for unexpected counterChoice — pick a sensible default per tier.
-	goto EventScript_AIRivalBattleB2Balanced
+	case 0,  EventScript_AIRivalBattleB2_Char_F
+	case 1,  EventScript_AIRivalBattleB2_Char_N
+	case 2,  EventScript_AIRivalBattleB2_Char_X
+	case 3,  EventScript_AIRivalBattleB2_Squirt_F
+	case 4,  EventScript_AIRivalBattleB2_Squirt_N
+	case 5,  EventScript_AIRivalBattleB2_Squirt_X
+	case 6,  EventScript_AIRivalBattleB2_Bulba_F
+	case 7,  EventScript_AIRivalBattleB2_Bulba_N
+	case 8,  EventScript_AIRivalBattleB2_Bulba_X
+	case 9,  EventScript_AIRivalBattleB3_Char_F
+	case 10, EventScript_AIRivalBattleB3_Char_N
+	case 11, EventScript_AIRivalBattleB3_Char_X
+	case 12, EventScript_AIRivalBattleB3_Squirt_F
+	case 13, EventScript_AIRivalBattleB3_Squirt_N
+	case 14, EventScript_AIRivalBattleB3_Squirt_X
+	case 15, EventScript_AIRivalBattleB3_Bulba_F
+	case 16, EventScript_AIRivalBattleB3_Bulba_N
+	case 17, EventScript_AIRivalBattleB3_Bulba_X
+	@ Fallback for unexpected counterChoice — default to Battle 2 Bulba_X.
+	goto EventScript_AIRivalBattleB2_Bulba_X
 
-EventScript_AIRivalBattleB2AntiFire::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_ANTI_FIRE, Text_RivalVictory
+EventScript_AIRivalBattleB2_Char_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_CHAR_F, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB2AntiWater::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_ANTI_WATER, Text_RivalVictory
+EventScript_AIRivalBattleB2_Char_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_CHAR_N, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB2AntiGrass::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_ANTI_GRASS, Text_RivalVictory
+EventScript_AIRivalBattleB2_Char_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_CHAR_X, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB2AntiFlying::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_ANTI_FLYING, Text_RivalVictory
+EventScript_AIRivalBattleB2_Squirt_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_SQUIRT_F, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB2AntiBug::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_ANTI_BUG, Text_RivalVictory
+EventScript_AIRivalBattleB2_Squirt_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_SQUIRT_N, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB2Balanced::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_BALANCED, Text_RivalVictory
+EventScript_AIRivalBattleB2_Squirt_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_SQUIRT_X, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3AntiFire::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_ANTI_FIRE, Text_RivalVictory
+EventScript_AIRivalBattleB2_Bulba_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_BULBA_F, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3AntiWater::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_ANTI_WATER, Text_RivalVictory
+EventScript_AIRivalBattleB2_Bulba_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_BULBA_N, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3AntiGrass::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_ANTI_GRASS, Text_RivalVictory
+EventScript_AIRivalBattleB2_Bulba_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B2_BULBA_X, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3AntiFlying::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_ANTI_FLYING, Text_RivalVictory
+EventScript_AIRivalBattleB3_Char_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_CHAR_F, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3AntiBug::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_ANTI_BUG, Text_RivalVictory
+EventScript_AIRivalBattleB3_Char_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_CHAR_N, Text_RivalVictory
 	return
-
-EventScript_AIRivalBattleB3Balanced::
-	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_BALANCED, Text_RivalVictory
+EventScript_AIRivalBattleB3_Char_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_CHAR_X, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Squirt_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_SQUIRT_F, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Squirt_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_SQUIRT_N, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Squirt_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_SQUIRT_X, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Bulba_F::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_BULBA_F, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Bulba_N::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_BULBA_N, Text_RivalVictory
+	return
+EventScript_AIRivalBattleB3_Bulba_X::
+	trainerbattle_no_intro TRAINER_AI_RIVAL_B3_BULBA_X, Text_RivalVictory
 	return
 
 PokeLive_Text_AIRivalProactive:
