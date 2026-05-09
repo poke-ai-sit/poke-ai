@@ -1223,9 +1223,9 @@
 
 // Unused hidden item flags
 #define FLAG_HIDE_PALLET_PROACTIVE_RIVAL 0x4A7 // PokeLive proactive rival hide flag
-#define FLAG_UNUSED_0x4A8               0x4A8 // Unused Flag
-#define FLAG_UNUSED_0x4A9               0x4A9 // Unused Flag
-#define FLAG_UNUSED_0x4AA               0x4AA // Unused Flag
+#define FLAG_HIDE_ROUTE1_AI_RIVAL       0x4A8 // PokeLive Smart Gary hide flag (Route 1)
+#define FLAG_HIDE_ROUTE2_AI_RIVAL       0x4A9 // PokeLive Smart Gary hide flag (Route 2)
+#define FLAG_HIDE_PEWTER_GYM_AI_RIVAL   0x4AA // PokeLive Smart Gary hide flag (Pewter Gym)
 #define FLAG_UNUSED_0x4AB               0x4AB // Unused Flag
 #define FLAG_UNUSED_0x4AC               0x4AC // Unused Flag
 #define FLAG_UNUSED_0x4AD               0x4AD // Unused Flag

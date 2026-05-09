@@ -10860,3 +10860,98 @@ static const struct TrainerMonNoItemDefaultMoves sParty_CueBallPaxton[] = {
         .species = SPECIES_MUK,
     },
 };
+
+/* PokeLive Smart Gary AI Rival — replaces 12 anti-X parties.
+ * 9 Battle-2 trainers + 9 Battle-3 trainers, indexed by
+ *   counter_choice = starter_idx (0..2) * 3 + caught_idx (0..2)
+ *   starter_idx: 0=rival Charmander, 1=rival Squirtle, 2=rival Bulbasaur
+ *   caught_idx:  0=anti-Flying, 1=anti-Normal, 2=Default
+ * Slot 0 always counters the player's starter type; slot 1+ counter the
+ * latest caught Pokemon (or default to a versatile mon).
+ *
+ * Levels are pinned to 5 (slot 0) / 3 (slot 1+) per Edmund's demo spec. */
+
+/* ---- Battle 2: 2 mons, base starter at lvl 5 ---- */
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Char_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIKACHU,    .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Char_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Char_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Squirt_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Squirt_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Squirt_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Bulba_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIKACHU,    .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Bulba_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2_Bulba_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+};
+
+/* ---- Battle 3: 3 mons, base starter at lvl 5, slots 1+2 lvl 3 ---- */
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Char_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIKACHU,    .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Char_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Char_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_CHARMANDER, .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Squirt_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIKACHU,    .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Squirt_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Squirt_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_SQUIRTLE,   .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Bulba_F[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIKACHU,    .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Bulba_N[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_MANKEY,     .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+};
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3_Bulba_X[] = {
+    { .iv = 100, .lvl = 5, .species = SPECIES_BULBASAUR,  .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_PIDGEY,     .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_NONE, MOVE_NONE} },
+    { .iv = 100, .lvl = 3, .species = SPECIES_GEODUDE,    .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE} },
+};

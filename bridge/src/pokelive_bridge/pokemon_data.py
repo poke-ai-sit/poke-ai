@@ -13,10 +13,9 @@ _TIMEOUT = 5.0
 def species_name(species_id: int) -> str:
     """Return uppercase species name for a numeric species ID.
 
-    Checks the offline Gen 1 table first (instant, no network).
-    Falls back to PokéAPI for Gen 2/3 and custom Pokémon IDs.
-    Custom Pokémon injected by Sprint-004 will have IDs not in any table;
-    those fall back to 'CUSTOM#<id>'.
+    Checks the patched-ROM offline table first (instant, no network).
+    Falls back to PokéAPI for species IDs not in the offline table.
+    Custom Pokémon injected outside known slots fall back to 'CUSTOM#<id>'.
     """
     if species_id <= 0:
         return f"#{species_id}"

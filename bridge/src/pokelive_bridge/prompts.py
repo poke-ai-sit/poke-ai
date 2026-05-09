@@ -24,7 +24,7 @@ ADVICE_HINT = (
     "Always name the specific Pokemon from the party that needs to act. "
     "If coverage is MISSING name that Pokemon and the exact move it should learn. "
     "If level warning is shown name that Pokemon and its level target. "
-    "Example: Train CHARMANDER to L13 Metal Claw. "
+    "Example: Train PRATA to L13 Metal Claw. "
     "Keep reply under 40 chars."
 )
 
@@ -101,7 +101,10 @@ def build_codex_system_prompt_ask(
         f"Map group: {game_state.map_group}, map number: {game_state.map_num}\n"
         f"Player position: ({game_state.x}, {game_state.y})"
     )
+    party_block = _party_block(party)
     context = f"<game_state>\n{state_block}\n</game_state>"
+    if party_block:
+        context += f"\n\n<party>\n{party_block}\n</party>"
     return f"{_BASE_PERSONA_ASK}\n\n{context}"
 
 

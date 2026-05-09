@@ -13,7 +13,7 @@ from pokelive_bridge.battle_agent import (
 )
 from pokelive_bridge.openai_client import ask_codex
 from pokelive_bridge.pokemon_text import format_dialog_hex, sanitize_dialog_text
-from pokelive_bridge.rival_agent import rival_react
+from pokelive_bridge.rival_agent import reset_memory, rival_react
 
 
 class HealthResponse(BaseModel):
@@ -71,10 +71,13 @@ class RivalEventRequest(BaseModel):
         "won_battle",
         "lost_battle",
         "entered_new_area",
+        "first_capture",
+        "second_capture",
     ]
     game_state: GameStateRequest
     party: list[PartyEntryRequest] | None = None
     details: dict[str, Any] | None = None
+    rival_name: str | None = None
 
 
 class RivalEventResponse(BaseModel):
@@ -83,13 +86,35 @@ class RivalEventResponse(BaseModel):
     message_hex: str
     action: Literal["approach", "idle"]
     game_state: GameStateRequest
+    # Populated only for battle-setup triggers (first_capture / second_capture).
+    # Lua writes this byte to gRivalAIBuffer.counterChoice so the C-side
+    # battle script picks the right rival lead.
+    counter_choice: int | None = None
+    counter_label: str | None = None
+    # Pokegear-style narration shown BEFORE the rival warps in. Three short
+    # textboxes the player advances with A. Lua decodes each hex blob into
+    # gRivalEncounterBuffer.callPages[i] so the ROM script can msgbox them
+    # via BufferRivalCallNextPage. None for non-battle-setup triggers.
+    call_pages: list[str] | None = None
+    call_pages_hex: list[str] | None = None
+    # Sprint-007 runtime party override. Each slot is {species, level,
+    # moves: [m0,m1,m2,m3]}. Lua writes these straight into
+    # gRivalAIBuffer.partyOverride; the C-side hook in CreateNPCTrainerParty
+    # then rebuilds gEnemyParty from them, replacing whatever the
+    # dispatched base trainer's static party held. None for non-battle
+    # triggers.
+    party_override: list[dict[str, Any]] | None = None
+    # Per-slot reasoning string explaining the counter pick. Echoed to the
+    # mGBA script console by Lua so the audience sees the type-chart logic
+    # the picker followed live.
+    party_reasoning: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
 # Smart Gary battle endpoints
 # ---------------------------------------------------------------------------
 
-BattleId = Literal["battle_1_oaks_lab", "battle_2_route_1", "battle_3_pewter"]
+BattleId = Literal["battle_1_oaks_lab", "battle_2_first_capture", "battle_3_second_capture"]
 
 
 class BattleMonState(BaseModel):
@@ -116,6 +141,7 @@ class RivalBattlePlanRequest(BaseModel):
     player_party: list[BattleMonState]
     rival_party: list[BattleMonState] | None = None
     game_state: GameStateRequest | None = None
+    rival_name: str | None = None
 
 
 class RivalBattlePlanResponse(BaseModel):
@@ -124,6 +150,7 @@ class RivalBattlePlanResponse(BaseModel):
     opening_taunt: str
     opening_taunt_hex: str
     strategy_summary: str
+    reasoning_trace: list[str] = []  # step-by-step reasoning shown to audience
 
 
 class RivalTauntRequest(BaseModel):
@@ -133,6 +160,7 @@ class RivalTauntRequest(BaseModel):
     player_mon: BattleMonState
     last_player_move: str | None = None
     last_rival_move: str | None = None
+    rival_name: str | None = None
 
 
 class RivalTauntResponse(BaseModel):
@@ -145,6 +173,7 @@ class RivalBattleSummaryRequest(BaseModel):
     outcome: Literal["won", "lost", "fled"]
     battle_log: list[BattleLogEntry]
     game_state: GameStateRequest | None = None
+    rival_name: str | None = None
 
 
 class RivalBattleSummaryResponse(BaseModel):
@@ -154,6 +183,7 @@ class RivalBattleSummaryResponse(BaseModel):
 
 app = FastAPI(title="PokéLive Bridge")
 latest_game_state: GameStateRequest | None = None
+latest_rival_plan: RivalBattlePlanResponse | None = None
 
 
 @app.get("/health")
@@ -210,32 +240,71 @@ def post_codex_chat(chat: CodexChatRequest) -> CodexChatResponse:
     )
 
 
+class RivalMemoryResetResponse(BaseModel):
+    reset: bool
+
+
+@app.post("/rival-memory-reset")
+def post_rival_memory_reset() -> RivalMemoryResetResponse:
+    """Wipe agents/rival/memory.md back to template state.
+
+    Called by Lua once on script load so every demo run starts with a clean
+    rival memory — prevents GPT from anchoring on stale party data and
+    inverting the actual battle parties in its opening line.
+    """
+    reset_memory()
+    return RivalMemoryResetResponse(reset=True)
+
+
 @app.post("/rival-event")
 def post_rival_event(event: RivalEventRequest) -> RivalEventResponse:
     global latest_game_state
 
     latest_game_state = event.game_state
 
-    message = rival_react(
+    result = rival_react(
         trigger=event.trigger,
         game_state=event.game_state,
         party=event.party,
         details=event.details,
+        rival_name=event.rival_name,
     )
+    message = result["message"]
+    call_pages = result.get("call_pages")
+    call_pages_hex: list[str] | None = None
+    if call_pages:
+        call_pages_hex = [
+            format_dialog_hex(p, chars_per_line=200, lines_per_page=1)
+            for p in call_pages
+        ]
 
     return RivalEventResponse(
-        speaker="Gary",
+        speaker=event.rival_name or "Rival",
         message=message,
         message_hex=format_dialog_hex(message, chars_per_line=200, lines_per_page=1),
         action="approach",
         game_state=event.game_state,
+        counter_choice=result.get("counter_choice"),
+        counter_label=result.get("counter_label"),
+        call_pages=call_pages,
+        call_pages_hex=call_pages_hex,
+        party_override=result.get("party_override"),
+        party_reasoning=result.get("party_reasoning"),
     )
+
+
+@app.get("/rival-latest-plan")
+def get_rival_latest_plan() -> RivalBattlePlanResponse:
+    """Return the most recent battle plan (for the website thinking panel)."""
+    if latest_rival_plan is None:
+        raise HTTPException(status_code=404, detail="No battle plan has been generated yet.")
+    return latest_rival_plan
 
 
 @app.post("/rival-battle-plan")
 def post_rival_battle_plan(req: RivalBattlePlanRequest) -> RivalBattlePlanResponse:
     """Pre-battle: GPT reads memory + opponent + outputs counter + score boosts + opening line."""
-    global latest_game_state
+    global latest_game_state, latest_rival_plan
     if req.game_state is not None:
         latest_game_state = req.game_state
 
@@ -244,16 +313,20 @@ def post_rival_battle_plan(req: RivalBattlePlanRequest) -> RivalBattlePlanRespon
         player_party=req.player_party,
         rival_party=req.rival_party,
         game_state=req.game_state,
+        rival_name=req.rival_name,
     )
 
     opening = plan["opening_taunt"]
-    return RivalBattlePlanResponse(
+    response = RivalBattlePlanResponse(
         counter_choice=plan["counter_choice"],
         move_scores=plan["move_scores"],
         opening_taunt=opening,
         opening_taunt_hex=format_dialog_hex(opening, chars_per_line=200, lines_per_page=1),
         strategy_summary=plan["strategy_summary"],
+        reasoning_trace=plan.get("reasoning_steps", []),
     )
+    latest_rival_plan = response
+    return response
 
 
 @app.post("/rival-taunt")
@@ -267,6 +340,7 @@ def post_rival_taunt(req: RivalTauntRequest) -> RivalTauntResponse:
         player_mon=req.player_mon,
         last_player_move=req.last_player_move,
         last_rival_move=req.last_rival_move,
+        rival_name=req.rival_name,
     )
     return RivalTauntResponse(
         taunt=taunt,
@@ -288,6 +362,7 @@ def post_rival_battle_summary(
         outcome=req.outcome,
         battle_log=req.battle_log,
         game_state=req.game_state,
+        rival_name=req.rival_name,
     )
     return RivalBattleSummaryResponse(
         summary=result["summary"],

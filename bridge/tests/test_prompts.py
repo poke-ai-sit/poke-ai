@@ -66,7 +66,7 @@ def test_advice_prompt_injects_map_and_position() -> None:
 def test_advice_prompt_includes_party_block_when_party_given() -> None:
     party = [_PartyEntry(7, 10, 28, 30, [33, 39, 0, 0], 14, 16, 12, 12, 13)]
     prompt = build_codex_system_prompt_advice(_make_state(), party=party)
-    assert "SQUIRTLE" in prompt
+    assert "FRANKSON" in prompt
     assert "L10" in prompt
 
 
@@ -80,10 +80,11 @@ def test_advice_prompt_omits_party_block_when_party_is_empty() -> None:
     assert "<party>" not in prompt
 
 
-def test_ask_prompt_does_not_include_party_block() -> None:
+def test_ask_prompt_includes_party_block_when_party_given() -> None:
     party = [_PartyEntry(4, 8, 22, 24, [10, 45, 0, 0], 11, 9, 14, 10, 9)]
     prompt = build_codex_system_prompt_ask(_make_state(), party=party)
-    assert "<party>" not in prompt
+    assert "<party>" in prompt
+    assert "PRATA" in prompt
 
 
 def test_backward_compat_alias_returns_ask_prompt() -> None:
@@ -110,7 +111,7 @@ def test_advice_prompt_lists_all_party_members() -> None:
         _PartyEntry(19, 3, 11, 11, [33, 0, 0, 0], 7, 6, 9, 5, 5),      # Rattata L3
     ]
     prompt = build_codex_system_prompt_advice(_make_state(), party=party)
-    assert "CHARMANDER" in prompt
+    assert "PRATA" in prompt
     assert "RATTATA" in prompt
     assert "FOCUS:" not in prompt
 
@@ -124,7 +125,7 @@ def test_advice_prompt_preserves_party_order() -> None:
     prompt = build_codex_system_prompt_advice(_make_state(), party=party)
     party_start = prompt.index("<party>")
     party_section = prompt[party_start:]
-    assert party_section.find("CHARMANDER") < party_section.find("RATTATA")
+    assert party_section.find("PRATA") < party_section.find("RATTATA")
 
 
 def test_advice_hint_references_coverage_and_training() -> None:

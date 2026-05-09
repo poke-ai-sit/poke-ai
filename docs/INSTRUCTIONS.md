@@ -15,7 +15,7 @@ Hackathon-day team and shipping focus:
 | Shaun Liew Xin Hong | Professor GPT — AI Advice NPC | SPRINT-003 (done) |
 | Edmund Lin Zhenming | AI Rival — autonomous walk-up + Smart Gary battles | SPRINT-005 (in progress) |
 
-Sprint-004 (custom Pokémon creator, Desmond) and Sprint-006 (multi-feature polish) were dropped/folded with team consent on 2026-05-09. See `docs/BUILD.md`.
+Sprint-006 (multi-feature polish) was folded into Sprint-005 Hour 7 dry-run. Sprint-004 (Pokémon sprite generator website) shipped on 2026-05-09 and is merged to dev. See `docs/BUILD.md`.
 
 Ask the user who you are working with if they haven't said. Then introduce yourself in this format:
 
@@ -107,14 +107,14 @@ main      ← release branch. Only humans promote dev → main.
 | `main` is sacred | Claude never pushes to `main`. Humans promote `dev → main` when ready |
 | Keep branches short-lived | Merge into `dev` within the sprint; don't let branches drift |
 
-**Active branches as of 2026-05-08:**
+**Active branches as of 2026-05-09:**
 
 | Branch | Owner | Status |
 |---|---|---|
-| `feat/006-demo-polish` | All | 🔲 In progress — hackathon demo cleanup (current) |
-| `feat/003-party-context` | Shaun | ✅ Done, merged to dev |
+| `feat/003-party-context` | Shaun | ✅ Done, merged to dev, deleted |
+| `feat/004-pokemon-creator` | Shaun | ✅ Done, merged to dev, deleted |
 | `feat/005-ai-npc` / `feat/005c-rival-rom-mvp` | Edmund | ✅ Done, merged to dev |
-| `feat/004-pokemon-creator` | Desmond | 🔲 Not started |
+| `feat/006-demo-polish` | All | ✅ Done, folded into Sprint-005 dry-run, merged to dev |
 
 ```bash
 # Start a new sprint (always branch from latest dev)

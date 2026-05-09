@@ -987,7 +987,16 @@ PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexBalls::
 	end
 
 PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveStub::
-	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub, MSGBOX_DEFAULT
+	special EvolveCustomPokemon
+	goto_if_eq VAR_RESULT, TRUE, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveSuccess
+	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveNoPrata, MSGBOX_DEFAULT
+	release
+	end
+
+PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveSuccess::
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveSuccess, MSGBOX_DEFAULT
+	waitfanfare
 	release
 	end
 
@@ -1021,8 +1030,11 @@ PalletTown_ProfessorOaksLab_Text_ProfessorCodexAskPrompt:
 PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveConfirm:
 	.string "EVOLVE YOUR CUSTOM POKEMON?$"
 
-PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub:
-	.string "EVOLUTION TOOL IS NEXT.$"
+PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveSuccess:
+	.string "PRATA evolved into\nPRATA PRO!$"
+
+PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveNoPrata:
+	.string "No PRATA in your party.$"
 
 PalletTown_ProfessorOaksLab_Text_ProfessorCodexThinking:
 	.string "GPT5.5 IS THINKING.$"
@@ -1219,7 +1231,13 @@ PalletTown_ProfessorOaksLab_EventScript_ChoseStarter::
 	call EventScript_RestorePrevTextColor
 	setflag FLAG_SYS_POKEMON_GET
 	setflag FLAG_PALLET_LADY_NOT_BLOCKING_SIGN
-	givemon PLAYER_STARTER_SPECIES, 5
+	@ PokeLive demo: starter is dealt at level 100 so the player has a fully-
+	@ scaled mon for the rival cinematics regardless of which species they pick.
+	@ Stats are computed from species base stats × level inside CreateMon, and
+	@ moveset is the last 4 entries of the level-up learnset by the time level
+	@ 100 is reached, so PRATA / BULBASAUR / FRANKSON all walk out with their
+	@ endgame statline + endgame attacks.
+	givemon PLAYER_STARTER_SPECIES, 10
 	copyvar VAR_STARTER_MON, PLAYER_STARTER_NUM
 	bufferspeciesname STR_VAR_1, PLAYER_STARTER_SPECIES
 	message PalletTown_ProfessorOaksLab_Text_ReceivedMonFromOak

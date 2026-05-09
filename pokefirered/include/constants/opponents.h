@@ -746,12 +746,34 @@
 #define TRAINER_CHAMPION_REMATCH_BULBASAUR       740
 #define TRAINER_CHAMPION_REMATCH_CHARMANDER      741
 #define TRAINER_CUE_BALL_PAXTON                  742
+// PokeLive Smart Gary AI Rival — counter_choice encoding:
+//   counter_choice = starter_idx * 3 + caught_idx [+ 9 if Battle 3]
+//   starter_idx: 0=rival CHAR (player Bulba), 1=rival SQUIRT (player Char), 2=rival BULBA (player Squirt)
+//   caught_idx:  0=anti-Flying, 1=anti-Normal, 2=Default (mixed)
+#define TRAINER_AI_RIVAL_B2_CHAR_F               743
+#define TRAINER_AI_RIVAL_B2_CHAR_N               744
+#define TRAINER_AI_RIVAL_B2_CHAR_X               745
+#define TRAINER_AI_RIVAL_B2_SQUIRT_F             746
+#define TRAINER_AI_RIVAL_B2_SQUIRT_N             747
+#define TRAINER_AI_RIVAL_B2_SQUIRT_X             748
+#define TRAINER_AI_RIVAL_B2_BULBA_F              749
+#define TRAINER_AI_RIVAL_B2_BULBA_N              750
+#define TRAINER_AI_RIVAL_B2_BULBA_X              751
+#define TRAINER_AI_RIVAL_B3_CHAR_F               752
+#define TRAINER_AI_RIVAL_B3_CHAR_N               753
+#define TRAINER_AI_RIVAL_B3_CHAR_X               754
+#define TRAINER_AI_RIVAL_B3_SQUIRT_F             755
+#define TRAINER_AI_RIVAL_B3_SQUIRT_N             756
+#define TRAINER_AI_RIVAL_B3_SQUIRT_X             757
+#define TRAINER_AI_RIVAL_B3_BULBA_F              758
+#define TRAINER_AI_RIVAL_B3_BULBA_N              759
+#define TRAINER_AI_RIVAL_B3_BULBA_X              760
 
-// NOTE: Because each Trainer uses a flag to determine when they are defeated, there is 
+// NOTE: Because each Trainer uses a flag to determine when they are defeated, there is
 //       only space for 25 additional trainers before trainer flag space overflows.
 //       MAX_TRAINERS_COUNT can be increased but will take up additional saveblock space
 
-#define NUM_TRAINERS                             743
+#define NUM_TRAINERS                             761
 #define MAX_TRAINERS_COUNT                       768
 
 #endif  // GUARD_CONSTANTS_OPPONENTS_H

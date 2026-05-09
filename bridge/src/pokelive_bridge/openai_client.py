@@ -36,7 +36,7 @@ def ask_codex(
     if request_kind == "ADVICE":
         system_prompt = build_codex_system_prompt_advice(game_state, party)
     else:
-        system_prompt = build_codex_system_prompt_ask(game_state)
+        system_prompt = build_codex_system_prompt_ask(game_state, party)
 
     client = _get_client()
     try:

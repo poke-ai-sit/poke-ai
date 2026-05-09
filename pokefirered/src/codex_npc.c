@@ -46,6 +46,8 @@ struct PokeliveCodexMailbox
  */
 #define POKELIVE_RIVAL_ENCOUNTER_MAGIC 0x52454E43  /* "RENC" */
 #define RIVAL_ENCOUNTER_MESSAGE_LENGTH 200
+#define RIVAL_ENCOUNTER_CALL_PAGE_LENGTH 50
+#define RIVAL_ENCOUNTER_CALL_PAGES 3
 
 enum
 {
@@ -60,6 +62,12 @@ struct PokeliveRivalEncounter
     u8  messageLength;
     u8  pad[2];
     u8  message[RIVAL_ENCOUNTER_MESSAGE_LENGTH];
+    /* Hours 5-6 Pokegear-call cinematic: three short narration pages that
+     * play before the rival actually appears. Lua writes each page when the
+     * /rival-event response comes back (only for first_capture and
+     * second_capture triggers). The C-side BufferRivalCallNextPage ladder
+     * cycles them through gStringVar1 so the script can msgbox each. */
+    u8  callPages[RIVAL_ENCOUNTER_CALL_PAGES][RIVAL_ENCOUNTER_CALL_PAGE_LENGTH];
 };
 
 struct PokelivePartyEntry
@@ -89,7 +97,11 @@ static EWRAM_DATA u8 sCodexPromptBuffer[CODEX_INPUT_LENGTH + 1] = {0};
 EWRAM_DATA struct PokeliveCodexMailbox gPokeliveCodexMailbox = {0};
 EWRAM_DATA struct PokelivePartyData gPokelivePartyData = {0};
 EWRAM_DATA struct PokeliveRivalEncounter gRivalEncounterBuffer = {0};
-EWRAM_DATA struct PokeliveRivalAIBuffer gRivalAIBuffer = {0};
+EWRAM_DATA struct PokeliveRivalAIBuffer gRivalAIBuffer = {
+    /* partyMagic is the alignment sentinel; Lua reads this before writing
+     * the partyOverride slots and bails loudly if it doesn't match. */
+    .partyMagic = POKELIVE_RIVAL_PARTY_SENTINEL,
+};
 
 static const u8 sCodexAdvicePrompt[] = _("What should I do next.");
 static const u8 sCodexEvolvePrompt[] = _("Evolve my custom Pokemon.");
@@ -260,4 +272,131 @@ void BufferRivalMessage(void)
     else
         StringCopy(gStringVar1, gRivalEncounterBuffer.message);
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
+}
+
+/* Pokegear-style multi-page call dialogue (Hours 5-6). The script does:
+ *   special ResetRivalCallPageIndex
+ *   special BufferRivalCallNextPage  ; advances index, copies into gStringVar1
+ *   msgbox "{STR_VAR_1}$"            ; player clicks A
+ *   special BufferRivalCallNextPage
+ *   msgbox "{STR_VAR_1}$"
+ *   ... etc.
+ * Cycling through gStringVar1 lets us reuse one msgbox label across all
+ * three pages without needing gStringVar2/3 (which are only 20 bytes).
+ *
+ * EWRAM_DATA placement is required — without it the linker drops this static
+ * into a discarded .data section under the MODERN=1 build, breaking the
+ * elf link with "defined in discarded section .data". The other statics in
+ * this file (sCodexPromptBuffer) use the same pattern. */
+static EWRAM_DATA u8 sRivalCallPageIndex = 0;
+
+void ResetRivalCallPageIndex(void)
+{
+    sRivalCallPageIndex = 0;
+}
+
+void BufferRivalCallNextPage(void)
+{
+    u8 idx;
+    EnsureRivalEncounterInitialized();
+    idx = sRivalCallPageIndex;
+    if (idx >= RIVAL_ENCOUNTER_CALL_PAGES)
+        idx = RIVAL_ENCOUNTER_CALL_PAGES - 1;
+    if (gRivalEncounterBuffer.callPages[idx][0] == EOS)
+        gStringVar1[0] = EOS;
+    else
+        StringCopy(gStringVar1, gRivalEncounterBuffer.callPages[idx]);
+    sRivalCallPageIndex++;
+}
+
+/* Smart Gary AI Rival — counterChoice → trainer-id dispatcher.
+ * Reads gRivalAIBuffer.counterChoice (0..11) and returns the resolved
+ * trainer ID via gSpecialVar_Result. The map_script_2 then uses a
+ * `switch + case` ladder on VAR_RESULT to invoke the correct
+ * trainerbattle (the trainer ID is required as a script-time immediate
+ * in the trainerbattle bytecode, so we cannot patch it dynamically).
+ *
+ * If counterChoice is out of range we fall back to the BALANCED variant
+ * appropriate for the current battle tier. Lua chooses tier (B2 vs B3)
+ * by writing 0..5 or 6..11 to counterChoice.
+ */
+void GetAIRivalCounterChoice(void)
+{
+    gSpecialVar_Result = gRivalAIBuffer.counterChoice;
+}
+
+/* Sprint-004 EVOLVE — Prata (Charmander) → Prata Pro (Charmeleon).
+ * Scans the player party for the first Charmander, swaps the species,
+ * recalculates stats, and reports success/failure via gSpecialVar_Result. */
+void EvolveCustomPokemon(void)
+{
+    u16 species;
+    u16 newSpecies;
+    int i;
+
+    for (i = 0; i < gPlayerPartyCount; i++)
+    {
+        species = GetMonData(&gPlayerParty[i], MON_DATA_SPECIES, NULL);
+        if (species == SPECIES_CHARMANDER)
+        {
+            newSpecies = SPECIES_CHARMELEON;
+            SetMonData(&gPlayerParty[i], MON_DATA_SPECIES, &newSpecies);
+            CalculateMonStats(&gPlayerParty[i]);
+            gSpecialVar_Result = TRUE;
+            return;
+        }
+    }
+    gSpecialVar_Result = FALSE;
+}
+
+/* Sprint-007 RUNTIME RIVAL PARTY OVERRIDE.
+ *
+ * Materialises gEnemyParty[] from the bridge-supplied gRivalAIBuffer
+ * partyOverride slots. Called from CreateNPCTrainerParty in battle_main.c
+ * AFTER the standard static party load runs, so even a single 1-mon base
+ * trainer can host any 1-6 mon dynamic team the bridge picks. The override
+ * is consumed (count zeroed) so a follow-up battle (e.g. Brock right after)
+ * doesn't reuse stale data.
+ *
+ * Mon construction mirrors the F_TRAINER_PARTY_CUSTOM_MOVESET branch:
+ * CreateMon for species/level/IVs/personality, then SetMonData per move
+ * slot to lock the moves and refresh PP. */
+void ApplyPokeliveRivalPartyOverride(struct Pokemon *party)
+{
+    u8 count;
+    u8 i, j;
+    struct PokeliveRivalPartySlot *slot;
+
+    if (gRivalAIBuffer.partyOverrideCount == 0)
+        return;
+
+    count = gRivalAIBuffer.partyOverrideCount;
+    if (count > POKELIVE_RIVAL_OVERRIDE_MAX)
+        count = POKELIVE_RIVAL_OVERRIDE_MAX;
+    if (count > PARTY_SIZE)
+        count = PARTY_SIZE;
+
+    /* Wipe whatever the static base trainer wrote, then reconstruct from
+     * the bridge override. CalculateEnemyPartyCount() walks gEnemyParty
+     * looking for SPECIES_NONE so the trailing slots will be ignored. */
+    ZeroEnemyPartyMons();
+
+    for (i = 0; i < count; i++)
+    {
+        slot = &gRivalAIBuffer.partyOverride[i];
+        if (slot->species == SPECIES_NONE)
+            continue;
+
+        CreateMon(&party[i], slot->species, slot->level, 100,
+                  TRUE, 0x88, OT_ID_RANDOM_NO_SHINY, 0);
+
+        for (j = 0; j < MAX_MON_MOVES; j++)
+        {
+            SetMonData(&party[i], MON_DATA_MOVE1 + j, &slot->moves[j]);
+            SetMonData(&party[i], MON_DATA_PP1 + j,
+                       &gBattleMoves[slot->moves[j]].pp);
+        }
+    }
+
+    gRivalAIBuffer.partyOverrideCount = 0;
 }

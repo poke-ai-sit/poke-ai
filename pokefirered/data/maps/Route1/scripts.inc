@@ -1,5 +1,47 @@
 Route1_MapScripts::
+	map_script MAP_SCRIPT_ON_LOAD, Route1_OnLoad
+	map_script MAP_SCRIPT_ON_FRAME_TABLE, Route1_OnFrame
 	.byte 0
+
+@ Always hide the proactive AI rival on map enter so existing battery saves
+@ from before this feature was added still load cleanly.
+Route1_OnLoad::
+	setflag FLAG_HIDE_ROUTE1_AI_RIVAL
+	end
+
+Route1_OnFrame::
+	map_script_2 VAR_TEMP_0, 1, Route1_EventScript_AIRivalEncounter
+	.2byte 0
+
+@ PokeLive Smart Gary AI Rival — Battle 2 cinematic.
+@ Lua sets VAR_TEMP_0=1 after the player's first capture (anywhere).
+@ The rival warps in adjacent to the player (right side), takes a single
+@ step toward them, delivers the GPT taunt, and battles using the
+@ Lua-selected counter team.
+Route1_EventScript_AIRivalEncounter::
+	lockall
+	call EventScript_AIRivalPhoneCall
+	getplayerxy VAR_0x8004, VAR_0x8005
+	addvar VAR_0x8004, 5
+	setobjectxyperm LOCALID_ROUTE1_AI_RIVAL, VAR_0x8004, VAR_0x8005
+	setobjectmovementtype LOCALID_ROUTE1_AI_RIVAL, MOVEMENT_TYPE_FACE_LEFT
+	playse SE_WARP_IN
+	addobject LOCALID_ROUTE1_AI_RIVAL
+	applymovement LOCALID_ROUTE1_AI_RIVAL, Route1_Movement_AIRivalApproach
+	waitmovement 0
+	call EventScript_AIRivalEncounterCinematic
+	removeobject LOCALID_ROUTE1_AI_RIVAL
+	setflag FLAG_HIDE_ROUTE1_AI_RIVAL
+	setvar VAR_TEMP_0, 0
+	releaseall
+	end
+
+Route1_Movement_AIRivalApproach::
+	walk_left
+	walk_left
+	walk_left
+	walk_left
+	step_end
 
 Route1_EventScript_MartClerk::
 	lock

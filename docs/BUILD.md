@@ -159,13 +159,88 @@ ADVICE prompt includes the player's live party and next-gym context so GPT gives
 
 ---
 
-### SPRINT-004 — Personalization: AI Pokémon Creator
-**Owner:** Desmond Chye Zhi Hao
-**Status:** [x] Closed — not shipping
-**Branch:** —
+### SPRINT-004 — Pokémon Sprite Generator Website (PokéLive Creator)
+**Owner:** Shaun Liew Xin Hong
+**Status:** [x] Done
+**Branch:** feat/004-pokemon-creator (merged to dev, deleted 2026-05-09)
+**Started:** 2026-05-09
 **Closed:** 2026-05-09
 
-Dropped from hackathon scope with team consent. Custom-Pokémon EWRAM injection is non-trivial (checksum recalculation, save-block coherence) and the Smart Gary track is the stronger demo. Notes preserved in git history (commit before this one) if we ever pick it back up.
+#### Goal
+Standalone Next.js 14 website where users describe a custom Pokémon concept, click Generate, and get a GBA-style pixel art sprite (front + back) and a 40×40 party icon — all powered by OpenAI `gpt-image-2`.
+
+#### Tasks
+- [x] Scaffold `website/` with Next.js 14 App Router + TypeScript + TailwindCSS
+- [x] Press Start 2P font + authentic FireRed colour system (red-dominant palette)
+- [x] `lib/openai-image.ts` — `generateSprite()` and `editSpriteWithReference()` (lazy OpenAI client)
+- [x] `lib/prompts.ts` — `SYSTEM_SPRITE_PROMPT` + `buildFinalPrompt()`
+- [x] `lib/icon-extract.ts` — `sharp` nearest-neighbor crop to 40×40 party icon
+- [x] `lib/validation.ts` — Zod schemas for request/response
+- [x] `app/api/generate-sprite/route.ts` — POST handler, `runtime="nodejs"`, `maxDuration=120`
+- [x] `components/HomeClient.tsx` — `useReducer` state machine (idle → loading → success/error)
+- [x] `components/SpriteGeneratorForm.tsx` — textarea, quick-example chips (Rusty Car, Ferrari, Smooth Criminal), ImageUpload
+- [x] `components/SpritePreview.tsx` + `components/IconPreview.tsx` — pixelated upscale + download
+- [x] `components/LoadingDialog.tsx` + `components/ErrorDialog.tsx` — HP-bar loading animation, red error panel
+- [x] `components/ImageUpload.tsx` — drag-drop + file picker + client-side canvas resize
+- [x] Fix `quality: "high"` → `quality: "low"` (high=90s+ timeout, low=16-32s) — root cause of generation timeout
+- [x] `npm run build` passes with zero TypeScript errors
+- [x] E2E smoke test: Rusty Car prompt → sprite returned in ~23s
+
+#### Notes
+- `quality: "low"` is correct for GBA pixel art — no perceptible quality loss at 64×64 sprite resolution.
+- `gpt-image-2` does NOT accept `response_format` parameter (returns 400); `b64_json` is the default response — do not pass it explicitly.
+- API key is the same `OPENAI_API_KEY` used by the FastAPI bridge — copy from `bridge/.env` into `website/.env.local`.
+- Dev server runs on `PORT=3001` to avoid conflict with bridge on `8000`; or just use `3000` if bridge is off.
+- `<img>` is used (not Next.js `<Image>`) intentionally — `image-rendering: pixelated` on base64 data URLs requires native `<img>`.
+
+#### Run the Website
+```bash
+cd website
+cp .env.example .env.local   # then fill in OPENAI_API_KEY
+npm install
+npm run dev                  # → http://localhost:3000 (or PORT=3001 if bridge is running)
+npm run build                # production build check
+```
+
+---
+
+### SPRINT-004b — In-Game Sprite & Icon Injection (PokéLive ROM)
+**Owner:** Desmond Chye Zhi Hao
+**Status:** [~] In Progress — icon bug fixes applied, pending in-game verify
+**Branch:** feat/004-AI-Pokémon-Creator
+**Started:** 2026-05-09
+**Closed:** —
+
+#### Goal
+Replace Charmander → Prata, Charmeleon → Prata Pro, Squirtle → Frankson inside the ROM: front sprite, back sprite, and Pokédex icon all show the custom pixel art.
+
+#### Custom Pokémon Mapping
+
+| Original | Custom Name | Asset source |
+|---|---|---|
+| Charmander | Prata | `sprite_gen/assets/prata_generated.png` (front/back), `prata_icon.png` (icon) |
+| Charmeleon | Prata Pro | `sprite_gen/assets/prata_pro_generated.png`, `prata_pro_icon.png` |
+| Squirtle | Frankson | `sprite_gen/assets/frankson_generated.png`, `frankson_icon.png` |
+
+#### Tasks — Front/Back Sprites
+- [x] `sprite_gen/process.py` — `process_sprite()`: crop → resize 64×64 → joint 16-color quantize → save indexed PNG + JASC-PAL
+- [x] `sprite_gen/main.py` — CLI: `python main.py <source> <pokemon_name>`
+- [x] Front + back sprites generated and copied to `pokefirered/graphics/pokemon/{charmander,charmeleon,squirtle}/`
+
+#### Tasks — Icon Pipeline
+- [x] `process_icon()` in `process.py`: resize → magenta sentinel → quantize 16 colors → stack 2 frames → 32×64
+- [x] `--icon --icon-pal-slot N` flags in `main.py`
+- [x] Icons generated; per-Pokémon palette slots assigned (Charmander=0, Charmeleon=1, Squirtle=2) in `pokemon_icon.c`
+- [x] Fix: transparency sentinel switched white→magenta so car windows don't become transparent holes
+- [x] Fix: `_snap_sentinel()` collapses LANCZOS edge blends; `_apply_palette()` clamps indices to 0–15
+- [x] ROM rebuilt: `pokefirered_modern.gba` (MODERN=1, arm-none-eabi-gcc 15.2.0, EWRAM 259950/262144)
+- [x] Lua EWRAM addresses updated for MODERN build (all 4 symbols)
+- [ ] **Verify in-game** — load `pokefirered_modern.gba`; confirm icon + sprite render correctly
+
+#### Notes
+- ROM is `pokefirered_modern.gba` (MODERN=1 build). All Lua EWRAM addresses target this build.
+- Magenta `#FF00FF` is the GBA transparency sentinel at palette index 0 — do not use white.
+- Each of the 3 custom Pokémon has its own icon palette slot so colors don't bleed across species.
 
 ---
 
@@ -220,10 +295,11 @@ The rival reasons about game state, remembers past player encounters, walks towa
 - [x] **Validated in mGBA:** addresses correct (Charmander/Scratch, Squirtle/Tackle read out of `gBattleMons` / `gCurrentMove`); Battle 1 in Oak's Lab logged 6 turns and produced a RESULT entry in `agents/rival/memory.md`
 
 **What's next**
-- [ ] **Hour 4 — fire `/rival-battle-plan` at battle entry.** Currently nothing calls `post_rival_battle_plan(...)`, so `gRivalAIBuffer.active` stays 0 and Gary uses canon AI. Need: in `check_battle_transitions()`, on the `outcome == 0` first-frame transition (or via a custom EWRAM byte set by the battle script), gather both parties via `read_battle_mon(0..3)` and POST. Verify Gary's first move shifts vs. a control battle.
-- [ ] **Hour 4 — display `opening_taunt`.** Either route through the existing `gRivalEncounterBuffer` mailbox or print to script panel for v1.
-- [ ] **Hour 5 — Battle 2.** New trainer `TRAINER_AI_RIVAL_ROUTE_1`, Route 1 walk-up cinematic, party balanced against likely player team.
-- [ ] **Hour 6 — Battle 3.** Pewter Gym entrance, same pattern. Optional: pagination for `opening_taunt > 45` chars.
+- [x] **Hour 4 — fire `/rival-battle-plan` at battle entry.** `check_battle_transitions()` now POSTs on the first observed `outcome == 0` bootstrap frame: full player party from `gPokelivePartyData` + active rival slots 1/3 from `gBattleMons`. Single-pending guard at the top of the function prevents double-fire. Lua-side mGBA validation pending (no graphical test environment available here).
+- [x] **Hour 4 — display `opening_taunt`.** Routed to script panel only (Option B). The existing `gRivalEncounterBuffer` cinematic relies on a map_script_2 frame handler on the overworld, which does not fire mid-battle, so Option A wasn't viable for v1. Strategy summary also printed for narration.
+- [x] **Hour 4b — fix Battle 1 silent skip.** First in-session battle (Oak's Lab `4:3`) was missing its `/rival-battle-plan` POST while Battle 2 (Route 1 `3:19`) worked. Two root causes in `check_battle_transitions()`: (a) the function early-returned on any in-flight `pending` HTTP request — a `/game-state` POST queued by the player's last walking step into the lab routinely landed in that window; (b) bootstrap fired on `outcome == 0` alone, which is also the value on the overworld, so the watcher was racing the actual battle-start frame. Fix: drop the `pending` early-return, gate bootstrap on `gBattleMons[1].species != 0` (rival lead loaded — only true mid-battle), and queue the plan POST into `deferred_battle_plan` if `pending` is busy at battle-start, retrying every frame until it lands. Also throttled `/game-state` chatter from per-step (every x/y change) to per-map-change with a 2s wall-clock floor — the bridge no longer gets spammed once per walking step.
+- [~] **Hour 5 — Battle 2 (ROM side).** Added 6 new trainers (`TRAINER_AI_RIVAL_B2_ANTI_FIRE` … `TRAINER_AI_RIVAL_B2_BALANCED`) at level 7-9 with type-counter parties. Added shared cinematic primitive `EventScript_AIRivalEncounterCinematic` + dispatch ladder `EventScript_AIRivalDispatchTrainerBattle` (12-way `switch`/`case` on `gRivalAIBuffer.counterChoice` via new special `GetAIRivalCounterChoice`). Wired Route 1 + Route 2 `OnFrame` triggers on `VAR_TEMP_0 == 1`; rival NPC warps in adjacent (player x+2), single step + `SE_WARP_IN`, msgbox the GPT taunt, `trainerbattle_no_intro`, hide. Map.json adds hidden rival object event guarded by `FLAG_HIDE_ROUTE{1,2}_AI_RIVAL`. Viridian Forest punted (pathfinding edge-cases noted in Phase 3).
+- [~] **Hour 6 — Battle 3 (ROM side).** Added 6 new trainers (`TRAINER_AI_RIVAL_B3_ANTI_FIRE` … `TRAINER_AI_RIVAL_B3_BALANCED`) at level 11-13 with 3-4 mon counter parties. Wired `MAP_PEWTER_CITY_GYM` `OnFrame` trigger on `VAR_TEMP_0 == 1`; rival warps in 2 tiles below player and walks up 1 tile (gym is narrow, vertical motion is safe). Brock untouched. Map.json adds hidden rival guarded by `FLAG_HIDE_PEWTER_GYM_AI_RIVAL`. New flags: `FLAG_HIDE_ROUTE1_AI_RIVAL=0x4A8`, `FLAG_HIDE_ROUTE2_AI_RIVAL=0x4A9`, `FLAG_HIDE_PEWTER_GYM_AI_RIVAL=0x4AA`. New LOCALIDs: `LOCALID_ROUTE1_AI_RIVAL=3`, `LOCALID_ROUTE2_AI_RIVAL=8`, `LOCALID_PEWTER_GYM_AI_RIVAL=4`. ROM rebuild + EWRAM verification still pending (sandbox blocks `make` from this agent).
 - [ ] **Hour 7 — demo dry-run.** Full playthrough start → Battle 3, with `agents/rival/memory.md` tail visible to judges.
 
 **Move-log dedup polish (low priority)**

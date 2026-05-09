@@ -24,6 +24,7 @@
 #include "party_menu.h"
 #include "pokeball.h"
 #include "pokedex.h"
+#include "pokelive_rival_ai.h"
 #include "quest_log.h"
 #include "random.h"
 #include "roamer.h"
@@ -1632,6 +1633,12 @@ static u8 CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)
         }
 
         gBattleTypeFlags |= gTrainers[trainerNum].doubleBattle;
+
+        /* Sprint-007 RUNTIME RIVAL PARTY OVERRIDE — if the host bridge has
+         * written a dynamic party into gRivalAIBuffer.partyOverride, replace
+         * the static party we just loaded with it. Lets a single 1-mon base
+         * trainer host any AI-picked counter team without burning trainer IDs. */
+        ApplyPokeliveRivalPartyOverride(party);
     }
 
     return gTrainers[trainerNum].partySize;
