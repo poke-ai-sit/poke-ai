@@ -204,6 +204,46 @@ npm run build                # production build check
 
 ---
 
+### SPRINT-004b — In-Game Sprite & Icon Injection (PokéLive ROM)
+**Owner:** Desmond Chye Zhi Hao
+**Status:** [~] In Progress — icon bug fixes applied, pending in-game verify
+**Branch:** feat/004-AI-Pokémon-Creator
+**Started:** 2026-05-09
+**Closed:** —
+
+#### Goal
+Replace Charmander → Prata, Charmeleon → Prata Pro, Squirtle → Frankson inside the ROM: front sprite, back sprite, and Pokédex icon all show the custom pixel art.
+
+#### Custom Pokémon Mapping
+
+| Original | Custom Name | Asset source |
+|---|---|---|
+| Charmander | Prata | `sprite_gen/assets/prata_generated.png` (front/back), `prata_icon.png` (icon) |
+| Charmeleon | Prata Pro | `sprite_gen/assets/prata_pro_generated.png`, `prata_pro_icon.png` |
+| Squirtle | Frankson | `sprite_gen/assets/frankson_generated.png`, `frankson_icon.png` |
+
+#### Tasks — Front/Back Sprites
+- [x] `sprite_gen/process.py` — `process_sprite()`: crop → resize 64×64 → joint 16-color quantize → save indexed PNG + JASC-PAL
+- [x] `sprite_gen/main.py` — CLI: `python main.py <source> <pokemon_name>`
+- [x] Front + back sprites generated and copied to `pokefirered/graphics/pokemon/{charmander,charmeleon,squirtle}/`
+
+#### Tasks — Icon Pipeline
+- [x] `process_icon()` in `process.py`: resize → magenta sentinel → quantize 16 colors → stack 2 frames → 32×64
+- [x] `--icon --icon-pal-slot N` flags in `main.py`
+- [x] Icons generated; per-Pokémon palette slots assigned (Charmander=0, Charmeleon=1, Squirtle=2) in `pokemon_icon.c`
+- [x] Fix: transparency sentinel switched white→magenta so car windows don't become transparent holes
+- [x] Fix: `_snap_sentinel()` collapses LANCZOS edge blends; `_apply_palette()` clamps indices to 0–15
+- [x] ROM rebuilt: `pokefirered_modern.gba` (MODERN=1, arm-none-eabi-gcc 15.2.0, EWRAM 259950/262144)
+- [x] Lua EWRAM addresses updated for MODERN build (all 4 symbols)
+- [ ] **Verify in-game** — load `pokefirered_modern.gba`; confirm icon + sprite render correctly
+
+#### Notes
+- ROM is `pokefirered_modern.gba` (MODERN=1 build). All Lua EWRAM addresses target this build.
+- Magenta `#FF00FF` is the GBA transparency sentinel at palette index 0 — do not use white.
+- Each of the 3 custom Pokémon has its own icon palette slot so colors don't bleed across species.
+
+---
+
 ### SPRINT-005 — AI Rival: Autonomous Behaviour, Memory & Smart Gary
 **Owner:** Edmund Lin Zhenming
 **Status:** [~] In Progress — Phases 1–3 done, Phase 4 (Smart Gary) Hours 2–3 done

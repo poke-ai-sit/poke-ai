@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from pokelive_bridge.openai_client import FALLBACK_RESPONSE, ask_codex
@@ -66,6 +67,33 @@ def test_ask_codex_sends_game_state_in_system_prompt() -> None:
     system_content = messages[0]["content"]
     assert "3" in system_content
     assert "0" in system_content
+
+
+def test_ask_codex_sends_party_in_ask_system_prompt() -> None:
+    state = _make_state()
+    party = [
+        SimpleNamespace(
+            species=4,
+            level=8,
+            hp=22,
+            max_hp=24,
+            moves=[10, 45, 0, 0],
+            attack=11,
+            defense=9,
+            speed=14,
+            sp_attack=10,
+            sp_defense=9,
+        )
+    ]
+
+    with patch("pokelive_bridge.openai_client._client") as mock_client:
+        mock_client.chat.completions.create.return_value = _mock_completion("ok")
+        ask_codex("Who is in my party?", state, party=party, request_kind="ASK")
+
+    messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+    system_content = messages[0]["content"]
+    assert "<party>" in system_content
+    assert "PRATA" in system_content
 
 
 def test_ask_codex_uses_enough_completion_tokens_for_reasoning_model() -> None:

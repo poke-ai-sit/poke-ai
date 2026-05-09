@@ -1,16 +1,15 @@
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
-# Offline species name table — Gen 1 (national dex 1-151)
-# IDs match FireRed species constants (equal to national dex number for Gen 1)
-# Custom Pokémon (Sprint-004) will use species IDs > 386; callers fall back
-# to PokéAPI or a custom label for any ID not in this table.
+# Offline species name table for the current patched ROM.
+# IDs match FireRed species constants. PokéLive custom Pokemon currently
+# reuse stock starter slots, so this table mirrors species_names.h.
 # ---------------------------------------------------------------------------
 
 SPECIES_NAMES: dict[int, str] = {
     1: "BULBASAUR", 2: "IVYSAUR", 3: "VENUSAUR",
-    4: "CHARMANDER", 5: "CHARMELEON", 6: "CHARIZARD",
-    7: "SQUIRTLE", 8: "WARTORTLE", 9: "BLASTOISE",
+    4: "PRATA", 5: "PRATA PRO", 6: "CHARIZARD",
+    7: "FRANKSON", 8: "WARTORTLE", 9: "BLASTOISE",
     10: "CATERPIE", 11: "METAPOD", 12: "BUTTERFREE",
     13: "WEEDLE", 14: "KAKUNA", 15: "BEEDRILL",
     16: "PIDGEY", 17: "PIDGEOTTO", 18: "PIDGEOT",
