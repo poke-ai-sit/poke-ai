@@ -234,6 +234,10 @@ local second_capture_tile_count = 0
 -- second_capture stay aligned.
 local POST_CAPTURE_TILE_DELAY = 2
 
+-- Pre-arm state for battle_1_oaks_lab. Set to true once we fire the plan POST
+-- on Oak's Lab map entry, so we only fire once per Lua session.
+local battle_1_prearmed = false
+
 -- The trigger string from the most-recently-fired rival_event. Read by the
 -- battle-entry watcher to pick battle_id (battle_2_first_capture vs.
 -- battle_3_second_capture). Cleared once consumed so it doesn't bleed.
@@ -1351,6 +1355,25 @@ local function check_rival_triggers()
       previous_party_count, party_count, map_sig,
       first_capture_state, second_capture_state
     ))
+  end
+
+  -- ----- battle_1 pre-arm: fire plan on Oak's Lab map entry -----------------
+  -- Gives GPT ~2-5 s lead time before the player can walk to Gary and trigger
+  -- the battle, fixing the timing race where plan arrived after turn 1.
+  if not battle_1_prearmed
+     and previous_map_sig ~= nil
+     and previous_map_sig ~= OAKS_LAB_MAP_SIG
+     and map_sig == OAKS_LAB_MAP_SIG
+     and not in_battle
+  then
+    battle_1_prearmed = true
+    local party = read_party_data()
+    if party and #party > 0 then
+      write_line("Pre-arming battle_1_oaks_lab plan on map entry")
+      fire_or_defer_battle_plan("battle_1_oaks_lab", party, nil, state)
+    else
+      write_line("Pre-arm: no party data yet; plan will fire at battle start instead")
+    end
   end
 
   -- ----- first_capture detector ---------------------------------------------
