@@ -1,0 +1,148 @@
+diff --git a/data/maps/PalletTown_ProfessorOaksLab/scripts.inc b/data/maps/PalletTown_ProfessorOaksLab/scripts.inc
+index ac67ee3c2..05e7bf52e 100644
+--- a/data/maps/PalletTown_ProfessorOaksLab/scripts.inc
++++ b/data/maps/PalletTown_ProfessorOaksLab/scripts.inc
+@@ -565,6 +565,7 @@ PalletTown_ProfessorOaksLab_EventScript_RivalChoseStarter::
+ PalletTown_ProfessorOaksLab_EventScript_ProfOak::
+ 	lock
+ 	faceplayer
++	goto_if_set FLAG_BEAT_RIVAL_IN_OAKS_LAB, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodex
+ 	goto_if_set SHOWED_OAK_COMPLETE_DEX, PalletTown_ProfessorOaksLab_EventScript_OakJustShownCompleteDex
+ 	goto_if_eq VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB, 9, PalletTown_ProfessorOaksLab_EventScript_RatePokedex
+ 	goto_if_eq VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB, 8, PalletTown_ProfessorOaksLab_EventScript_MonsAroundWorldWait
+@@ -948,6 +949,92 @@ PalletTown_ProfessorOaksLab_EventScript_PlayerAlreadyGotBalls::
+ 	release
+ 	end
+ 
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodex::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexMenuPrompt, MSGBOX_DEFAULT
++	multichoice 0, 0, MULTICHOICE_POKELIVE_CODEX, FALSE
++	switch VAR_RESULT
++	case 0, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexAdvice
++	case 1, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexAsk
++	case 2, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolve
++	case 3, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexExit
++	case SCR_MENU_CANCEL, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexExit
++	goto PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexExit
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexAdvice::
++	special PublishCodexAdvicePrompt
++	goto PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexWait
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexAsk::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexAskPrompt, MSGBOX_DEFAULT
++	special StartCodexPrompt
++	special PublishCodexPrompt
++	goto PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexWait
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolve::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveConfirm, MSGBOX_YESNO
++	goto_if_eq VAR_RESULT, YES, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveStub
++	goto PalletTown_ProfessorOaksLab_EventScript_ProfessorCodex
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexEvolveStub::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub, MSGBOX_DEFAULT
++	release
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexWait::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexThinking, MSGBOX_DEFAULT
++	setvar VAR_0x8004, 0
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexWaitLoop::
++	delay 15
++	addvar VAR_0x8004, 1
++	special IsCodexResponseReady
++	goto_if_eq VAR_RESULT, TRUE, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexShowResponse
++	goto_if_lt VAR_0x8004, 40, PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexWaitLoop
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexTimeout, MSGBOX_DEFAULT
++	release
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexShowResponse::
++	special BufferCodexResponse
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexResponse, MSGBOX_DEFAULT
++	release
++	end
++
++PalletTown_ProfessorOaksLab_EventScript_ProfessorCodexExit::
++	msgbox PalletTown_ProfessorOaksLab_Text_ProfessorCodexExit, MSGBOX_DEFAULT
++	release
++	end
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexMenuPrompt:
++	.string "PROFESSOR CODEX ONLINE.\p"
++	.string "WHAT DO YOU NEED.$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexAskPrompt:
++	.string "ENTER A MESSAGE FOR CODEX.$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveConfirm:
++	.string "EVOLVE YOUR CUSTOM POKEMON?$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexEvolveStub:
++	.string "EVOLUTION TOOL IS NEXT.$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexThinking:
++	.string "CODEX IS THINKING.$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexTimeout:
++	.string "NO REPLY YET.\p"
++	.string "CHECK THE BRIDGE.$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexResponse:
++	.string "{STR_VAR_1}$"
++
++PalletTown_ProfessorOaksLab_Text_ProfessorCodexExit:
++	.string "PROFESSOR CODEX WILL BE HERE.$"
++
+ PalletTown_ProfessorOaksLab_EventScript_DexSceneRivalEnterNorth::
+ 	setobjectxyperm LOCALID_OAKS_LAB_RIVAL, 5, 10
+ 	addobject LOCALID_OAKS_LAB_RIVAL
+diff --git a/include/constants/menu.h b/include/constants/menu.h
+index a36eb2524..88d6f2d15 100644
+--- a/include/constants/menu.h
++++ b/include/constants/menu.h
+@@ -69,6 +69,7 @@
+ #define MULTICHOICE_62                                         62
+ #define MULTICHOICE_JOIN_OR_LEAD                               63
+ #define MULTICHOICE_TRAINER_TOWER_MODE                         64
++#define MULTICHOICE_POKELIVE_CODEX                             65
+ 
+ #define MULTICHOICE_NONE                                      255
+ 
+diff --git a/src/script_menu.c b/src/script_menu.c
+index 5d47d5682..ce2e98c3d 100644
+--- a/src/script_menu.c
++++ b/src/script_menu.c
+@@ -45,6 +45,18 @@ static const struct MenuAction sMultichoiceList_YesNo[] = {
+     { gText_No }
+ };
+ 
++static const u8 sText_PokeliveCodexAdvice[] = _("ADVICE");
++static const u8 sText_PokeliveCodexAsk[] = _("ASK");
++static const u8 sText_PokeliveCodexEvolve[] = _("EVOLVE");
++static const u8 sText_PokeliveCodexExit[] = _("EXIT");
++
++static const struct MenuAction sMultichoiceList_PokeliveCodex[] = {
++    { sText_PokeliveCodexAdvice },
++    { sText_PokeliveCodexAsk },
++    { sText_PokeliveCodexEvolve },
++    { sText_PokeliveCodexExit },
++};
++
+ static const struct MenuAction sMultichoiceList_TrainerCardIconTint[] = {
+     { gText_Normal },
+     { gText_Black },
+@@ -568,6 +580,7 @@ static const struct MultichoiceListStruct sMultichoiceLists[] = {
+     [MULTICHOICE_62]                                         = MULTICHOICE(sMultichoiceList_62),
+     [MULTICHOICE_JOIN_OR_LEAD]                               = MULTICHOICE(sMultichoiceList_JoinOrLead),
+     [MULTICHOICE_TRAINER_TOWER_MODE]                         = MULTICHOICE(sMultichoiceList_TrainerTowerMode),
++    [MULTICHOICE_POKELIVE_CODEX]                             = MULTICHOICE(sMultichoiceList_PokeliveCodex),
+ };
+ 
+ // From Cool to Berries goes unused

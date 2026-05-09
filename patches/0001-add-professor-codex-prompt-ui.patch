@@ -1,0 +1,101 @@
+diff --git a/data/specials.inc b/data/specials.inc
+index ff4fae1f4..63eec81be 100644
+--- a/data/specials.inc
++++ b/data/specials.inc
+@@ -451,4 +451,6 @@ gSpecials::
+ 	def_special UpdateLoreleiDollCollection
+ 	def_special LoopWingFlapSound
++	def_special StartCodexPrompt, waitstate=1
++	def_special BufferCodexPrompt
+ 	def_special CreateEnemyEventMon
+ gSpecialsEnd::
+diff --git a/include/naming_screen.h b/include/naming_screen.h
+index 55c4f24d0..454e76bcf 100644
+--- a/include/naming_screen.h
++++ b/include/naming_screen.h
+@@ -8,7 +8,10 @@
+ #define NAMING_SCREEN_CAUGHT_MON    2
+ #define NAMING_SCREEN_NICKNAME      3
+ #define NAMING_SCREEN_RIVAL         4
++#define NAMING_SCREEN_CODEX         5
++
++#define CODEX_INPUT_LENGTH 32
+ 
+ void DoNamingScreen(u8 templateNum, u8 *destBuffer, u16 monSpecies, u16 monGender, u32 monPersonality, MainCallback returnCallback);
+ 
+ #endif // GUARD_NAMING_SCREEN_H
+diff --git a/src/codex_npc.c b/src/codex_npc.c
+new file mode 100644
+index 000000000..861eb8d5e
+--- /dev/null
++++ b/src/codex_npc.c
+@@ -0,0 +1,21 @@
++#include "global.h"
++#include "constants/characters.h"
++#include "naming_screen.h"
++#include "overworld.h"
++#include "string_util.h"
++
++static EWRAM_DATA u8 sCodexPromptBuffer[CODEX_INPUT_LENGTH + 1] = {0};
++
++void StartCodexPrompt(void)
++{
++    sCodexPromptBuffer[0] = EOS;
++    DoNamingScreen(NAMING_SCREEN_CODEX, sCodexPromptBuffer, 0, 0, 0, CB2_ReturnToFieldContinueScript);
++}
++
++void BufferCodexPrompt(void)
++{
++    if (sCodexPromptBuffer[0] == EOS)
++        gStringVar1[0] = EOS;
++    else
++        StringCopy(gStringVar1, sCodexPromptBuffer);
++}
+diff --git a/src/naming_screen.c b/src/naming_screen.c
+index ca3be258b..11b711a3f 100644
+--- a/src/naming_screen.c
++++ b/src/naming_screen.c
+@@ -152,7 +152,7 @@ struct NamingScreenData
+     /*0x0*/    u8 tilemapBuffer1[0x800];
+     /*0x800*/  u8 tilemapBuffer2[0x800];
+     /*0x800*/  u8 tilemapBuffer3[0x800];
+-    /*0x1800*/ u8 textBuffer[0x10];
++    /*0x1800*/ u8 textBuffer[CODEX_INPUT_LENGTH + 1];
+     /*0x1810*/ u8 tileBuffer[0x600];
+     /*0x1E10*/ u8 state;
+     /*0x1E11*/ u8 windows[WIN_COUNT];
+@@ -491,6 +491,8 @@ static void NamingScreen_Init(void)
+     sNamingScreen->template = sNamingScreenTemplates[sNamingScreen->templateNum];
+     sNamingScreen->currentPage = sNamingScreen->template->initialPage;
+     sNamingScreen->inputCharBaseXPos = (DISPLAY_WIDTH - sNamingScreen->template->maxChars * 8) / 2 + 6;
++    if (sNamingScreen->templateNum == NAMING_SCREEN_CODEX)
++        sNamingScreen->inputCharBaseXPos = 0x40;
+     sNamingScreen->keyRepeatStartDelayCopy = gKeyRepeatStartDelay;
+     memset(sNamingScreen->textBuffer, EOS, sizeof(sNamingScreen->textBuffer));
+     if (sNamingScreen->template->copyExistingString)
+@@ -2122,6 +2124,17 @@ static const struct NamingScreenTemplate sRivalNamingScreenTemplate = {
+     .title = gText_RivalsName,
+ };
+ 
++static const u8 sText_AskCodex[] = _("ASK CODEX");
++
++static const struct NamingScreenTemplate sCodexScreenTemplate = {
++    .copyExistingString = FALSE,
++    .maxChars = CODEX_INPUT_LENGTH,
++    .iconFunction = 0,
++    .addGenderIcon = 0,
++    .initialPage = KBPAGE_LETTERS_UPPER,
++    .title = sText_AskCodex,
++};
++
+ static const struct NamingScreenTemplate *const sNamingScreenTemplates[] =
+ {
+     [NAMING_SCREEN_PLAYER]     = &sPlayerNamingScreenTemplate,
+@@ -2129,6 +2142,7 @@ static const struct NamingScreenTemplate *const sNamingScreenTemplates[] =
+     [NAMING_SCREEN_CAUGHT_MON] = &sMonNamingScreenTemplate,
+     [NAMING_SCREEN_NICKNAME]   = &sMonNamingScreenTemplate,
+     [NAMING_SCREEN_RIVAL]      = &sRivalNamingScreenTemplate,
++    [NAMING_SCREEN_CODEX]      = &sCodexScreenTemplate,
+ };
+ 
+ static const struct OamData sOam_8x8 = {

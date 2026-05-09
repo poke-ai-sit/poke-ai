@@ -1,0 +1,211 @@
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Literal
+
+import openai
+
+from pokelive_bridge.config import (
+    OPENAI_API_KEY,
+    OPENAI_CHAT_MODEL,
+    OPENAI_MAX_COMPLETION_TOKENS,
+)
+from pokelive_bridge.map_data import map_name, resolve_map_signature
+from pokelive_bridge.pokemon_text import sanitize_dialog_text
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_AGENTS_DIR = _REPO_ROOT / "agents"
+_RIVAL_DIR = _AGENTS_DIR / "rival"
+_PERSONA_PATH = _RIVAL_DIR / "persona.md"
+_MEMORY_PATH = _RIVAL_DIR / "memory.md"
+
+# Last N lines of memory.md included in the rival's context window.
+_MEMORY_TAIL_LINES = 60
+
+# Hard upper bound on the message length we're willing to write into the
+# 256-byte EWRAM response buffer. Persona asks for under 80; this is a safety net.
+_MAX_MESSAGE_CHARS = 120
+
+FALLBACK_MESSAGE = "Next time you wont be so lucky."
+
+TriggerType = Literal[
+    "caught_pokemon",
+    "won_battle",
+    "lost_battle",
+    "entered_new_area",
+]
+
+_TRIGGER_DESCRIPTIONS: dict[str, str] = {
+    "caught_pokemon": "The player just caught a new Pokemon.",
+    "won_battle": "The player just won a battle.",
+    "lost_battle": "The player just lost a battle.",
+    "entered_new_area": "The player just entered a new map.",
+}
+
+
+_client: openai.OpenAI | None = None
+
+
+def _get_client() -> openai.OpenAI:
+    global _client
+    if _client is None:
+        _client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    return _client
+
+
+def _read_persona() -> str:
+    if not _PERSONA_PATH.exists():
+        return ""
+    return _PERSONA_PATH.read_text(encoding="utf-8")
+
+
+def _read_recent_memory(n_lines: int = _MEMORY_TAIL_LINES) -> str:
+    if not _MEMORY_PATH.exists():
+        return "(No prior encounters recorded.)"
+    lines = _MEMORY_PATH.read_text(encoding="utf-8").splitlines()
+    if not lines:
+        return "(No prior encounters recorded.)"
+    if len(lines) <= n_lines:
+        return "\n".join(lines)
+    return "\n".join(lines[-n_lines:])
+
+
+def _append_memory(entry: str) -> None:
+    _RIVAL_DIR.mkdir(parents=True, exist_ok=True)
+    with _MEMORY_PATH.open("a", encoding="utf-8") as f:
+        f.write(entry + "\n")
+
+
+def _format_party_block(party: list[Any] | None) -> str:
+    if not party:
+        return "Unknown"
+    from pokelive_bridge.pokemon_data import species_name
+
+    parts = [
+        f"{species_name(p.species)} L{p.level} HP {p.hp}/{p.max_hp}"
+        for p in party
+    ]
+    return ", ".join(parts)
+
+
+def _format_details_for_prompt(details: dict[str, Any] | None) -> str:
+    if not details:
+        return ""
+    parts: list[str] = []
+    for key, value in details.items():
+        if key in {"from_map", "to_map"} and isinstance(value, str):
+            parts.append(f"{key}: {resolve_map_signature(value)}")
+        else:
+            parts.append(f"{key}: {value}")
+    return "\n".join(parts)
+
+
+def _build_system_prompt(
+    trigger: str,
+    game_state: Any,
+    party: list[Any] | None,
+    details: dict[str, Any] | None = None,
+) -> str:
+    persona = _read_persona()
+    memory = _read_recent_memory()
+    party_block = _format_party_block(party)
+    trigger_text = _TRIGGER_DESCRIPTIONS.get(trigger, f"Trigger: {trigger}")
+    location = map_name(game_state.map_group, game_state.map_num)
+    details_block = _format_details_for_prompt(details)
+
+    situation_lines = [trigger_text, f"Location: {location}"]
+    if details_block:
+        situation_lines.append(details_block)
+
+    return (
+        f"{persona}\n\n"
+        f"---\n\n"
+        f"## Current Situation\n"
+        + "\n".join(situation_lines)
+        + "\n\n"
+        f"## Player's Current Party\n"
+        f"{party_block}\n\n"
+        f"## Your Memory of Past Encounters\n"
+        f"{memory}\n\n"
+        f"## Instructions\n"
+        f"React to the current situation in character.\n"
+        f"Reply with ONE punchy line under 45 characters total. Count them.\n"
+        f"Use only letters numbers spaces and periods.\n"
+        f"No exclamation marks no question marks no quotes.\n"
+        f"Use map names not numeric IDs when referencing places.\n"
+        f"If memory is relevant work it in naturally do not quote the log.\n"
+        f"Longer messages get truncated by the FireRed textbox. Stay tight.\n"
+    )
+
+
+def rival_react(
+    trigger: str,
+    game_state: Any,
+    party: list[Any] | None = None,
+    details: dict[str, Any] | None = None,
+) -> str:
+    """Generate the rival's reaction to a game event and persist it to memory."""
+    system_prompt = _build_system_prompt(trigger, game_state, party, details)
+    user_message = trigger if not details else f"{trigger}: {details}"
+
+    client = _get_client()
+    raw_message: str
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            max_completion_tokens=OPENAI_MAX_COMPLETION_TOKENS,
+        )
+        content = response.choices[0].message.content
+        raw_message = content.strip() if content else FALLBACK_MESSAGE
+    except Exception as e:
+        logging.exception("Rival GPT call failed: %s", e)
+        raw_message = FALLBACK_MESSAGE
+
+    sanitized = sanitize_dialog_text(raw_message)
+    if len(sanitized) > _MAX_MESSAGE_CHARS:
+        logging.warning(
+            "Rival message exceeded %d chars (%d). Truncating.",
+            _MAX_MESSAGE_CHARS,
+            len(sanitized),
+        )
+        sanitized = sanitized[:_MAX_MESSAGE_CHARS].rstrip()
+
+    _record_memory(trigger, game_state, party, details, sanitized)
+    return sanitized
+
+
+def _format_details_for_memory(details: dict[str, Any] | None) -> str | None:
+    if not details:
+        return None
+    parts: list[str] = []
+    for key, value in details.items():
+        if key in {"from_map", "to_map"} and isinstance(value, str):
+            parts.append(f"{key}={resolve_map_signature(value)} ({value})")
+        else:
+            parts.append(f"{key}={value}")
+    return ", ".join(parts)
+
+
+def _record_memory(
+    trigger: str,
+    game_state: Any,
+    party: list[Any] | None,
+    details: dict[str, Any] | None,
+    rival_message: str,
+) -> None:
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+    location = map_name(game_state.map_group, game_state.map_num)
+    lines = [f"\n## {timestamp}", f"Trigger: {trigger}"]
+    details_summary = _format_details_for_memory(details)
+    if details_summary:
+        lines.append(f"Details: {details_summary}")
+    lines.append(f"Map: {location} ({game_state.map_group}:{game_state.map_num})")
+    if party:
+        lines.append(f"Player party size: {len(party)}")
+    lines.append(f"Rival said: {rival_message}")
+    _append_memory("\n".join(lines))

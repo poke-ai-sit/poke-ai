@@ -1,0 +1,136 @@
+diff --git a/data/specials.inc b/data/specials.inc
+index 63eec81be..436e97849 100644
+--- a/data/specials.inc
++++ b/data/specials.inc
+@@ -453,5 +453,10 @@ gSpecials::
+ 	def_special LoopWingFlapSound
+ 	def_special StartCodexPrompt, waitstate=1
+ 	def_special BufferCodexPrompt
++	def_special PublishCodexAdvicePrompt
++	def_special PublishCodexPrompt
++	def_special PublishCodexEvolvePrompt
++	def_special IsCodexResponseReady
++	def_special BufferCodexResponse
+ 	def_special CreateEnemyEventMon
+ gSpecialsEnd::
+diff --git a/src/codex_npc.c b/src/codex_npc.c
+index 861eb8d5e..06b8479f7 100644
+--- a/src/codex_npc.c
++++ b/src/codex_npc.c
+@@ -1,10 +1,52 @@
+ #include "global.h"
+ #include "constants/characters.h"
++#include "event_data.h"
+ #include "naming_screen.h"
+ #include "overworld.h"
+ #include "string_util.h"
+ 
++#define POKELIVE_CODEX_MAILBOX_MAGIC 0x58454443
++#define CODEX_RESPONSE_LENGTH 256
++
++enum
++{
++    CODEX_MAILBOX_STATUS_IDLE,
++    CODEX_MAILBOX_STATUS_PENDING,
++    CODEX_MAILBOX_STATUS_RESPONSE_READY,
++    CODEX_MAILBOX_STATUS_ERROR,
++};
++
++struct PokeliveCodexMailbox
++{
++    u32 magic;
++    u16 seq;
++    u16 ack;
++    u8 status;
++    u8 reserved;
++    u16 commandLength;
++    u16 responseLength;
++    u8 command[CODEX_INPUT_LENGTH + 1];
++    u8 response[CODEX_RESPONSE_LENGTH + 1];
++};
++
+ static EWRAM_DATA u8 sCodexPromptBuffer[CODEX_INPUT_LENGTH + 1] = {0};
++EWRAM_DATA struct PokeliveCodexMailbox gPokeliveCodexMailbox = {0};
++
++static const u8 sCodexAdvicePrompt[] = _("What should I do next.");
++static const u8 sCodexEvolvePrompt[] = _("Evolve my custom Pokemon.");
++
++static void EnsureCodexMailboxInitialized(void)
++{
++    if (gPokeliveCodexMailbox.magic == POKELIVE_CODEX_MAILBOX_MAGIC)
++        return;
++
++    gPokeliveCodexMailbox.magic = POKELIVE_CODEX_MAILBOX_MAGIC;
++    gPokeliveCodexMailbox.seq = 0;
++    gPokeliveCodexMailbox.ack = 0;
++    gPokeliveCodexMailbox.status = CODEX_MAILBOX_STATUS_IDLE;
++    gPokeliveCodexMailbox.commandLength = 0;
++    gPokeliveCodexMailbox.responseLength = 0;
++}
+ 
+ void StartCodexPrompt(void)
+ {
+@@ -19,3 +57,63 @@ void BufferCodexPrompt(void)
+     else
+         StringCopy(gStringVar1, sCodexPromptBuffer);
+ }
++
++static u16 CopyCodexString(u8 *dest, const u8 *src, u16 maxLen)
++{
++    u16 i;
++
++    for (i = 0; i < maxLen && src[i] != EOS; i++)
++        dest[i] = src[i];
++
++    dest[i] = EOS;
++    return i;
++}
++
++static void PublishCodexCommand(const u8 *command)
++{
++    EnsureCodexMailboxInitialized();
++    gPokeliveCodexMailbox.commandLength = CopyCodexString(
++        gPokeliveCodexMailbox.command,
++        command,
++        CODEX_INPUT_LENGTH);
++    gPokeliveCodexMailbox.responseLength = 0;
++    gPokeliveCodexMailbox.response[0] = EOS;
++    gPokeliveCodexMailbox.seq++;
++    gPokeliveCodexMailbox.status = CODEX_MAILBOX_STATUS_PENDING;
++}
++
++void PublishCodexAdvicePrompt(void)
++{
++    PublishCodexCommand(sCodexAdvicePrompt);
++}
++
++void PublishCodexPrompt(void)
++{
++    if (sCodexPromptBuffer[0] == EOS)
++        PublishCodexCommand(sCodexAdvicePrompt);
++    else
++        PublishCodexCommand(sCodexPromptBuffer);
++}
++
++void PublishCodexEvolvePrompt(void)
++{
++    PublishCodexCommand(sCodexEvolvePrompt);
++}
++
++void IsCodexResponseReady(void)
++{
++    EnsureCodexMailboxInitialized();
++    gSpecialVar_Result =
++        gPokeliveCodexMailbox.status == CODEX_MAILBOX_STATUS_RESPONSE_READY
++     && gPokeliveCodexMailbox.ack == gPokeliveCodexMailbox.seq;
++}
++
++void BufferCodexResponse(void)
++{
++    EnsureCodexMailboxInitialized();
++    if (gPokeliveCodexMailbox.response[0] == EOS)
++        StringCopy(gStringVar1, gText_EmptyString2);
++    else
++        StringCopy(gStringVar1, gPokeliveCodexMailbox.response);
++    gPokeliveCodexMailbox.status = CODEX_MAILBOX_STATUS_IDLE;
++}

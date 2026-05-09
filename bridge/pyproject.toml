@@ -1,0 +1,31 @@
+[project]
+name = "pokelive-bridge"
+version = "0.1.0"
+description = "Local FastAPI bridge for PokéLive emulator integration"
+readme = "README.md"
+authors = [
+    { name = "Shaun Liew Xin hong", email = "shaunliew20@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.136.1",
+    "httpx>=0.28.1",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+pokelive-bridge = "pokelive_bridge:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.3",
+]
+
+[tool.fastapi]
+entrypoint = "pokelive_bridge.main:app"
