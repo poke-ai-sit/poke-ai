@@ -3,12 +3,27 @@
 import { useState } from "react";
 import ImageUpload from "./ImageUpload";
 
-interface Example { label: string; prompt: string; }
+interface Example {
+  label: string;
+  prompt: string;
+}
 
 const EXAMPLES: Example[] = [
-  { label: "Rusty Car",   prompt: "a small cute rusty old car, round headlights as eyes, happy expression, compact kei-car body style" },
-  { label: "Red Ferrari", prompt: "a sleek red Ferrari sports car Pokemon, aggressive headlights as eyes, low to the ground, intimidating expression, exhaust flames coming from the back" },
-  { label: "Jellyfish",   prompt: "a glowing blue jellyfish made of pure electricity, trailing crackling sparks, translucent bell, ethereal glow" },
+  {
+    label: "Rusty Car",
+    prompt:
+      "a small cute rusty old car, round headlights as eyes, happy expression, compact kei-car body style",
+  },
+  {
+    label: "Red Ferrari",
+    prompt:
+      "a sleek red Ferrari sports car Pokemon, aggressive headlights as eyes, low to the ground, intimidating expression, exhaust flames coming from the back",
+  },
+  {
+    label: "Smooth Criminal",
+    prompt:
+      "a Pokemon based on Michael Jackson's Smooth Criminal era - white fedora hat, white suit with black armband, doing the iconic 45-degree gravity-defying lean pose, one hand pointing forward, sparkly glove on one hand, humanoid but with cute Pokemon proportions, confident smirking expression",
+  },
 ];
 
 interface SpriteGeneratorFormProps {
@@ -16,7 +31,10 @@ interface SpriteGeneratorFormProps {
   isLoading: boolean;
 }
 
-export default function SpriteGeneratorForm({ onSubmit, isLoading }: SpriteGeneratorFormProps) {
+export default function SpriteGeneratorForm({
+  onSubmit,
+  isLoading,
+}: SpriteGeneratorFormProps) {
   const [prompt, setPrompt] = useState("");
   const [refImage, setRefImage] = useState<string | null>(null);
 
@@ -28,12 +46,9 @@ export default function SpriteGeneratorForm({ onSubmit, isLoading }: SpriteGener
 
   return (
     <form onSubmit={handleSubmit}>
-
       {/* Prompt input */}
       <div className="mb-6">
-        <label className="fr-label block mb-3">
-          DESCRIBE YOUR POKÉMON
-        </label>
+        <label className="fr-label block mb-3">DESCRIBE YOUR POKÉMON</label>
         <div className="fr-panel overflow-hidden">
           <textarea
             className="fr-input"
