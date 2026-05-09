@@ -330,11 +330,20 @@ def summarize_battle(
     rival_species_str = ", ".join(rival_species_seen) or "unknown"
     player_species_str = ", ".join(player_species_seen) or "unknown"
 
+    # `outcome` is from the player's POV (Lua reads gBattleOutcome which uses
+    # B_OUTCOME_WON when the *player* wins). The rival's perspective is the
+    # mirror image — if we hand "WON" straight to GPT, the rival writes "I
+    # won" when actually it lost. Translate before rendering.
+    player_outcome = outcome.lower()
+    rival_outcome_map = {"won": "LOST", "lost": "WON", "fled": "PLAYER FLED"}
+    rival_outcome = rival_outcome_map.get(player_outcome, outcome.upper())
+
     system_prompt = (
         f"{persona}\n\n"
         f"---\n"
         f"## Battle Just Finished — {label}\n"
-        f"Outcome: {outcome.upper()}\n\n"
+        f"Your outcome (rival side): {rival_outcome}\n"
+        f"Player outcome: {outcome.upper()}\n\n"
         f"### CRITICAL — Ground Truth (do not contradict this)\n"
         f"Your species (rival side): {rival_species_str}\n"
         f"Player's species: {player_species_str}\n\n"
@@ -344,11 +353,11 @@ def summarize_battle(
         f"{memory}\n\n"
         f"## Output\n"
         f"You must output ONE JSON object with exactly these keys:\n"
-        f"  summary: string under 200 chars — what happened in this battle.\n"
-        f"           Stay in character thinking back on the fight. ONLY name\n"
-        f"           species from the Ground Truth block above. NEVER invert\n"
-        f"           the parties — your side used {rival_species_str}, the\n"
-        f"           player used {player_species_str}.\n"
+        f"  summary: string under 200 chars — what happened in this battle\n"
+        f"           from YOUR (rival) point of view. Your outcome was\n"
+        f"           {rival_outcome}. ONLY name species from the Ground Truth\n"
+        f"           block above. NEVER invert the parties — your side used\n"
+        f"           {rival_species_str}, the player used {player_species_str}.\n"
         f"  lessons: string under 200 chars — what you learned about the\n"
         f"           player's preferences and what counter you should pick\n"
         f"           next time. Concrete and actionable, no fluff.\n"
@@ -390,9 +399,16 @@ def _record_battle_summary(
 ) -> None:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
     label = BATTLE_ID_LABELS.get(battle_id, battle_id)
+    # Memory is the rival's, so log the rival's outcome (mirror of the
+    # player-POV value Lua hands us). Future plan_battle calls read these
+    # entries and would otherwise see "Outcome: WON" for fights the rival
+    # actually lost.
+    rival_outcome_map = {"won": "LOST", "lost": "WON", "fled": "PLAYER FLED"}
+    rival_outcome = rival_outcome_map.get(outcome.lower(), outcome.upper())
     lines = [
         f"\n## {timestamp} — {label} (RESULT)",
-        f"Outcome: {outcome.upper()}",
+        f"Outcome (rival): {rival_outcome}",
+        f"Outcome (player): {outcome.upper()}",
         f"Turns: {len(battle_log)}",
     ]
     if battle_log:
