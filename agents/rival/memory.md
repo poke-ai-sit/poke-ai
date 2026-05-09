@@ -62,3 +62,9 @@ Trigger: entered_new_area
 Details: to_map=Pallet Town (3:0), from_map=Professor Oaks Lab (4:3)
 Map: Pallet Town (3:0)
 Rival said: Garys always two steps ahead of Pallet Town.
+
+## 2026-05-09T03:04
+Trigger: entered_new_area
+Details: from_map=Professor Oaks Lab (4:3), to_map=Pallet Town (3:0)
+Map: Pallet Town (3:0)
+Rival said: Back to Pallet after losing. Figures.
