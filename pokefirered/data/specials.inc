@@ -461,4 +461,5 @@ gSpecials::
 	def_special IsRivalEncounterPending
 	def_special BufferRivalMessage
 	def_special CreateEnemyEventMon
+	def_special GetAIRivalCounterChoice
 gSpecialsEnd::
