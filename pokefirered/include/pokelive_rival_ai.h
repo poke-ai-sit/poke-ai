@@ -39,4 +39,12 @@ extern struct PokeliveRivalAIBuffer gRivalAIBuffer;
  * reuse stale data. */
 void ApplyPokeliveRivalPartyOverride(struct Pokemon *party);
 
+/* Refreshes gPokelivePartyData (the EWRAM buffer Lua reads via
+ * read_party_data) from the live gPlayerParty[]. Hooked into
+ * GiveMonToPlayer so the bridge sees the player's just-caught mon
+ * the first time Lua POSTs /rival-event after a catch — without it,
+ * the buffer is whatever the last `special` left and the picker falls
+ * to defaults. */
+void UpdateCodexPartyData(void);
+
 #endif // GUARD_POKELIVE_RIVAL_AI_H

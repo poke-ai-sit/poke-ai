@@ -24,6 +24,7 @@
 #include "party_menu.h"
 #include "field_specials.h"
 #include "berry.h"
+#include "pokelive_rival_ai.h"
 #include "constants/items.h"
 #include "constants/item_effects.h"
 #include "constants/hoenn_cries.h"
@@ -3702,6 +3703,9 @@ u8 GiveMonToPlayer(struct Pokemon *mon)
 
     CopyMon(&gPlayerParty[i], mon, sizeof(*mon));
     gPlayerPartyCount = i + 1;
+    /* PokeLive: refresh the bridge-visible party buffer so the picker sees
+     * the just-caught (or just-gifted) Pokemon on the next /rival-event. */
+    UpdateCodexPartyData();
     return MON_GIVEN_TO_PARTY;
 }
 
