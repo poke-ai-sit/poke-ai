@@ -24,9 +24,23 @@ def clear_lru_caches() -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-def test_species_name_charmander_offline() -> None:
+def test_species_name_prata_offline() -> None:
     with patch("pokelive_bridge.pokemon_data.httpx.get") as mock_get:
-        assert species_name(4) == "CHARMANDER"
+        assert species_name(4) == "PRATA"
+    mock_get.assert_not_called()
+
+
+@pytest.mark.unit
+def test_species_name_prata_pro_offline() -> None:
+    with patch("pokelive_bridge.pokemon_data.httpx.get") as mock_get:
+        assert species_name(5) == "PRATA PRO"
+    mock_get.assert_not_called()
+
+
+@pytest.mark.unit
+def test_species_name_frankson_offline() -> None:
+    with patch("pokelive_bridge.pokemon_data.httpx.get") as mock_get:
+        assert species_name(7) == "FRANKSON"
     mock_get.assert_not_called()
 
 
@@ -34,13 +48,6 @@ def test_species_name_charmander_offline() -> None:
 def test_species_name_rattata_offline() -> None:
     with patch("pokelive_bridge.pokemon_data.httpx.get") as mock_get:
         assert species_name(19) == "RATTATA"
-    mock_get.assert_not_called()
-
-
-@pytest.mark.unit
-def test_species_name_squirtle_offline() -> None:
-    with patch("pokelive_bridge.pokemon_data.httpx.get") as mock_get:
-        assert species_name(7) == "SQUIRTLE"
     mock_get.assert_not_called()
 
 
