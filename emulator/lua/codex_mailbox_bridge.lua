@@ -150,10 +150,9 @@ local CHOSEN_MOVE_OFFSET      = 0x87        -- chosenMovePositions[battler] u8
 local BATTLE_MONS_ADDR        = 0x02023C04  -- gBattleMons[0]
 local BATTLE_MON_STRIDE       = 0x58        -- 88 bytes per BattlePokemon
 
--- gRivalAIBuffer: verified from pokefirered.map (agbcc/standard build 2026-05-09).
--- agbcc build: 0x0203F75C  ← correct for pokefirered with MODERN=0 (our ROM)
--- MODERN=1/gcc build places it at 0x0203F7F4 — do NOT use that value here.
-local RIVAL_AI_BUFFER_ADDR    = 0x0203F75C
+-- gRivalAIBuffer: re-verified from pokefirered.map after balance commit added
+-- trainer party data (6b3760e) shifted EWRAM layout. Address is now 0x0203F7F4.
+local RIVAL_AI_BUFFER_ADDR    = 0x0203F7F4
 local RIVAL_AI_BUFFER_MAGIC   = 0x52414942  -- "RAIB"
 
 -- Field offsets within each gBattleMons[i] entry
