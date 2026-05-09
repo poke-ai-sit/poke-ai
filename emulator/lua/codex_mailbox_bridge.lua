@@ -4,9 +4,9 @@ local HOST = "127.0.0.1"
 local PORT = 8000
 local SAVE_BLOCK_1_PTR = 0x03005008
 
--- EWRAM addresses from pokefirered.map (build 2026-05-07)
-local CODEX_MAILBOX_ADDR = 0x0203f4ac  -- gPokeliveCodexMailbox
-local PARTY_DATA_ADDR    = 0x0203f5dc  -- gPokelivePartyData
+-- EWRAM addresses from pokefirered_modern.map (MODERN=1 build 2026-05-09, arm-none-eabi-gcc 15.2.0)
+local CODEX_MAILBOX_ADDR = 0x020218f0  -- gPokeliveCodexMailbox
+local PARTY_DATA_ADDR    = 0x02021a20  -- gPokelivePartyData
 
 -- gPokelivePartyData struct constants
 local POKELIVE_PARTY_MAGIC = 0x50415254  -- "PART"
@@ -74,8 +74,8 @@ local TIMEOUT_RESPONSE_HEX = "CEE6ED00D5DBD5DDE2ADFF"
 -- Lua transitions IDLE → APPROACH_PENDING by writing magic + message + length
 -- + status, then flipping VAR_TEMP_0=1 in SaveBlock1.vars[0] to trigger the
 -- map_script_2 entry in PalletTown_OnFrame.
--- Address from pokefirered.map after build 2026-05-08 (post-merge with SPRINT-003).
-local RIVAL_ENCOUNTER_BUFFER_ADDR    = 0x0203f68c  -- gRivalEncounterBuffer
+-- Address from pokefirered_modern.map (MODERN=1 build 2026-05-09).
+local RIVAL_ENCOUNTER_BUFFER_ADDR    = 0x02021ad0  -- gRivalEncounterBuffer
 local RIVAL_ENCOUNTER_MAGIC          = 0x52454E43  -- "RENC"
 local RIVAL_ENCOUNTER_STATUS_PENDING = 1
 local RIVAL_ENCOUNTER_MESSAGE_MAX    = 200
@@ -130,9 +130,8 @@ local CHOSEN_MOVE_OFFSET      = 0x87        -- chosenMovePositions[battler] u8
 local BATTLE_MONS_ADDR        = 0x02023C04  -- gBattleMons[0]
 local BATTLE_MON_STRIDE       = 0x58        -- 88 bytes per BattlePokemon
 
--- gRivalAIBuffer (post-build 2026-05-09): Lua writes the AI move-score plan
--- here so the C-side BattleAI hook can apply boosts on Gary's first turn.
-local RIVAL_AI_BUFFER_ADDR    = 0x0203F75C
+-- gRivalAIBuffer (pokefirered_modern.map, MODERN=1 build 2026-05-09).
+local RIVAL_AI_BUFFER_ADDR    = 0x02021ba0
 local RIVAL_AI_BUFFER_MAGIC   = 0x52414942  -- "RAIB"
 
 -- Field offsets within each gBattleMons[i] entry

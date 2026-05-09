@@ -96,6 +96,8 @@ Patched ROM (pokefirered.gba)
 | 4a | Smart Gary battle endpoints + EWRAM hook (gRivalAIBuffer) | Done |
 | 4b | `/rival-battle-plan` POST at battle entry → Gary's first move shifts | In progress |
 | 4c | Battle 2 (Route 1) and Battle 3 (Pewter) cinematic + trainer | Pending |
+| S4a | Custom sprites: Prata / Prata Pro / Frankson (front + back, 64×64) | Done |
+| S4b | Custom icons: Pokédex icon replacement for Charmander/Charmeleon/Squirtle | In progress |
 | 5 | AI NPC vs AI NPC battle spectator mode | Stretch |
 
 ---

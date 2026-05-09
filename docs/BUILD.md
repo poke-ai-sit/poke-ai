@@ -161,11 +161,53 @@ ADVICE prompt includes the player's live party and next-gym context so GPT gives
 
 ### SPRINT-004 — Personalization: AI Pokémon Creator
 **Owner:** Desmond Chye Zhi Hao
-**Status:** [x] Closed — not shipping
-**Branch:** —
-**Closed:** 2026-05-09
+**Status:** [~] In Progress — sprite pipeline 80% done, icon injection remaining
+**Branch:** dev
+**Started:** 2026-05-09
+**Closed:** —
 
-Dropped from hackathon scope with team consent. Custom-Pokémon EWRAM injection is non-trivial (checksum recalculation, save-block coherence) and the Smart Gary track is the stronger demo. Notes preserved in git history (commit before this one) if we ever pick it back up.
+#### Goal
+Replace Charmander → Prata, Charmeleon → Prata Pro, Squirtle → Frankson in-game: front sprite, back sprite, and Pokédex icon all show the custom pixel art.
+
+#### Custom Pokémon Mapping
+
+| Original | Custom Name | Asset source |
+|---|---|---|
+| Charmander | Prata | `sprite_gen/assets/prata_generated.png` (front/back), `prata_icon.png` (icon) |
+| Charmeleon | Prata Pro | `sprite_gen/assets/prata_pro_generated.png`, `prata_pro_icon.png` |
+| Squirtle | Frankson | `sprite_gen/assets/frankson_generated.png`, `frankson_icon.png` |
+
+#### Tasks — Front/Back Sprites (done)
+- [x] `sprite_gen/process.py` — `process_sprite()`: crop → resize 64×64 → joint 16-color quantize → save indexed PNG + JASC-PAL
+- [x] `sprite_gen/main.py` — CLI: `python main.py <source> <pokemon_name>`
+- [x] Front + back sprites generated for prata, prata_pro, frankson
+- [x] `pokefirered/graphics/pokemon/charmander/front.png`, `back.png`, `normal.pal` replaced
+- [x] `pokefirered/graphics/pokemon/charmeleon/front.png`, `back.png`, `normal.pal` replaced
+- [x] `pokefirered/graphics/pokemon/squirtle/front.png`, `back.png`, `normal.pal` replaced
+
+#### Tasks — Icon Pipeline (remaining 20%)
+- [x] Add `process_icon()` to `sprite_gen/process.py`:
+  - Open `_icon.png` (353×707 RGBA), flatten alpha → white background
+  - Resize to 32×32 (LANCZOS), quantize to 16 colors, white at index 0
+  - Stack same frame twice vertically → 32×64 (2-frame GBA icon format)
+  - Save as indexed PNG (8bpp in file; gbagfx converts to 4bpp GBA during ROM build)
+- [x] Add `--icon` flag to `sprite_gen/main.py` — runs icon pipeline alongside or standalone
+- [x] Generate icons for all three Pokémon:
+  - `python main.py assets/prata_icon.png charmander --icon`
+  - `python main.py assets/prata_pro_icon.png charmeleon --icon`
+  - `python main.py assets/frankson_icon.png squirtle --icon`
+- [x] Verify output `icon.png` is 32×64, indexed, ≤16 colors (12–15 used — within gbagfx limit)
+- [x] **Rebuild ROM** — `make MODERN=1 -j4` via devkitPro MSYS2 on Windows → `pokefirered_modern.gba` (EWRAM: 259950/262144, 99.16%)
+- [x] **Update Lua EWRAM addresses** — all 4 addresses updated to match `pokefirered_modern.map` (modern compiler lays out EWRAM differently from agbcc)
+- [ ] **Verify in-game** — load `pokefirered_modern.gba` in mGBA; open Pokédex for Charmander/Charmeleon/Squirtle, confirm custom icons render
+
+#### Notes
+- GBA icon format: 32×64 PNG, 4bpp indexed (16 colors), 2 frames stacked vertically. Reference: `sprite_gen/assets/icon.png`.
+- `_icon.png` source files are 353×707 RGBA — far too large. The pipeline must resize them, not use them directly.
+- Frame 1 = Frame 2 (same image twice) — no animation blending needed for demo.
+- Icon palette: Charmander/Charmeleon/Squirtle all use FireRed icon palette slot 0 (`pokemon_icon.c`) — no palette table changes needed.
+- White (or near-white) must be at palette index 0 — GBA treats index 0 as transparent in icon rendering.
+- Do NOT change `pokemon_icon.c` palette assignments — slot 0 works fine for all three custom sprites.
 
 ---
 
