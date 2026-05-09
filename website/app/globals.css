@@ -3,18 +3,21 @@
 @tailwind utilities;
 
 /* ── FireRed Colour System ─────────────────────── */
+/* Palette inspired by the Pokédex device shell:    */
+/*   outer = fire-engine red, screen surround = dark maroon, content = cream */
 :root {
-  --fr-navy:    #18204b;   /* page / panel-bg-dark */
-  --fr-navy-lt: #2a3a7a;   /* button hover, secondary bg */
-  --fr-red:     #b81818;   /* Pokédex red accent */
-  --fr-red-lt:  #e84040;   /* button top-left inset */
-  --fr-red-dk:  #800000;   /* button bottom-right inset */
-  --fr-cream:   #f8f8e8;   /* panel background */
-  --fr-border:  #181818;   /* outer border, text */
-  --fr-shadow:  #585858;   /* bottom-right inset */
-  --fr-white:   #ffffff;   /* top-left inset highlight */
-  --fr-gray:    #a8a8a8;   /* secondary / placeholder */
-  --fr-blue:    #3050d8;   /* link / emphasis blue */
+  --fr-navy:    #2d0505;   /* page bg — dark maroon (Pokédex interior) */
+  --fr-navy-lt: #7a1515;   /* panel-dark / btn inset highlight — medium red */
+  --fr-red:     #cc2200;   /* fire-engine red — primary action / Pokédex shell */
+  --fr-red-lt:  #ff5533;   /* red inset top-left highlight */
+  --fr-red-dk:  #880000;   /* red inset bottom-right shadow */
+  --fr-cream:   #f8f8e8;   /* dialog panel background (unchanged) */
+  --fr-border:  #181818;   /* outer border, body text (unchanged) */
+  --fr-shadow:  #585858;   /* inset shadow / muted text (unchanged) */
+  --fr-white:   #ffffff;   /* inset highlight (unchanged) */
+  --fr-gray:    #a8a8a8;   /* placeholder text (unchanged) */
+  --fr-blue:    #3050d8;   /* secondary accent — kept for contrast */
+  --fr-orange:  #e85820;   /* fire-orange — title emphasis */
 
   /* Typography scale — readable at modern DPI */
   --fs-xl:   22px;   /* H1, game title */
@@ -37,7 +40,7 @@ body {
   margin: 0;
   background-color: var(--fr-navy);
   background-image:
-    radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+    radial-gradient(circle, rgba(255,100,80,0.07) 1px, transparent 1px);
   background-size: 16px 16px;
   color: var(--fr-border);
   font-family: var(--font-pixel), 'Courier New', monospace;
@@ -60,7 +63,7 @@ body {
   border: 4px solid var(--fr-border);
   box-shadow:
     inset  3px  3px 0 var(--fr-navy-lt),
-    inset -3px -3px 0 #0a0e26;
+    inset -3px -3px 0 #1a0000;
 }
 
 .fr-panel-red {
@@ -91,7 +94,7 @@ body {
   border: 4px solid var(--fr-border);
   box-shadow:
     inset  3px  3px 0 var(--fr-navy-lt),
-    inset -3px -3px 0 #0a0e26;
+    inset -3px -3px 0 #1a0000;
   padding: 12px 20px;
   font-family: inherit;
   font-size: var(--fs-md);
@@ -110,7 +113,7 @@ body {
 .fr-btn:active:not(:disabled) {
   box-shadow:
     inset -3px -3px 0 var(--fr-navy-lt),
-    inset  3px  3px 0 #0a0e26;
+    inset  3px  3px 0 #1a0000;
   transform: translate(2px, 2px);
 }
 

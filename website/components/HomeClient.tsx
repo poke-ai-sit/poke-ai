@@ -16,10 +16,14 @@ type Action =
 
 function reducer(_state: GenerateState, action: Action): GenerateState {
   switch (action.type) {
-    case "START":   return { status: "loading" };
-    case "SUCCESS": return { status: "success", sprite: action.sprite, icon: action.icon };
-    case "ERROR":   return { status: "error", message: action.message };
-    case "RESET":   return { status: "idle" };
+    case "START":
+      return { status: "loading" };
+    case "SUCCESS":
+      return { status: "success", sprite: action.sprite, icon: action.icon };
+    case "ERROR":
+      return { status: "error", message: action.message };
+    case "RESET":
+      return { status: "idle" };
   }
 }
 
@@ -43,11 +47,18 @@ export default function HomeClient() {
       const data = await res.json();
 
       if (!res.ok) {
-        dispatch({ type: "ERROR", message: data.error ?? "Generation failed." });
+        dispatch({
+          type: "ERROR",
+          message: data.error ?? "Generation failed.",
+        });
         return;
       }
 
-      dispatch({ type: "SUCCESS", sprite: data.spriteBase64, icon: data.iconBase64 });
+      dispatch({
+        type: "SUCCESS",
+        sprite: data.spriteBase64,
+        icon: data.iconBase64,
+      });
     } catch (err) {
       const msg =
         err instanceof Error && err.name === "AbortError"
@@ -62,9 +73,11 @@ export default function HomeClient() {
   const isLoading = state.status === "loading";
 
   return (
-    <div className="fr-scanlines" style={{ minHeight: "100vh", padding: "24px 16px 40px" }}>
+    <div
+      className="fr-scanlines"
+      style={{ minHeight: "100vh", padding: "24px 16px 40px" }}
+    >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-
         {/* ── Title bar ─── mimics the FireRed naming screen header */}
         <div
           className="fr-panel fr-appear"
@@ -89,11 +102,24 @@ export default function HomeClient() {
                   minHeight: 40,
                   flexShrink: 0,
                   border: "2px solid var(--fr-border)",
-                  boxShadow: "inset 1px 1px 0 var(--fr-red-lt), inset -1px -1px 0 var(--fr-red-dk)",
+                  boxShadow:
+                    "inset 1px 1px 0 var(--fr-red-lt), inset -1px -1px 0 var(--fr-red-dk)",
                 }}
               />
               <div>
-                <h1 className="fr-title" style={{ margin: 0 }}>PokéLive</h1>
+                <h1
+                  className="fr-title"
+                  style={{
+                    margin: 0,
+                    background:
+                      "linear-gradient(90deg, var(--fr-red) 0%, var(--fr-orange) 60%, #ffaa22 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  PokéLive
+                </h1>
                 <p className="fr-label fr-muted" style={{ margin: "4px 0 0" }}>
                   CUSTOM POKÉMON CREATOR
                 </p>
@@ -102,7 +128,12 @@ export default function HomeClient() {
           </div>
           <div
             className="fr-panel-dark"
-            style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 10 }}
+            style={{
+              padding: "8px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
           >
             <span
               style={{
@@ -131,7 +162,6 @@ export default function HomeClient() {
           }}
           className="main-grid"
         >
-
           {/* LEFT — Input panel */}
           <div>
             <div
@@ -148,7 +178,10 @@ export default function HomeClient() {
                 </span>
               </div>
 
-              <SpriteGeneratorForm onSubmit={handleGenerate} isLoading={isLoading} />
+              <SpriteGeneratorForm
+                onSubmit={handleGenerate}
+                isLoading={isLoading}
+              />
             </div>
 
             {/* Status dialogs appear below the form */}
@@ -170,7 +203,9 @@ export default function HomeClient() {
           {/* RIGHT — Results panel */}
           <div>
             {state.status === "success" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 20 }}
+              >
                 <SpritePreview spriteBase64={state.sprite} />
                 <IconPreview iconBase64={state.icon} />
                 <div style={{ textAlign: "right" }}>
@@ -224,9 +259,16 @@ export default function HomeClient() {
 
                 <div
                   className="fr-panel-dark"
-                  style={{ padding: "10px 20px", width: "100%", textAlign: "center" }}
+                  style={{
+                    padding: "10px 20px",
+                    width: "100%",
+                    textAlign: "center",
+                  }}
                 >
-                  <span className="fr-small" style={{ color: "var(--fr-gray)" }}>
+                  <span
+                    className="fr-small"
+                    style={{ color: "var(--fr-gray)" }}
+                  >
                     Powered by OpenAI gpt-image-2
                   </span>
                 </div>
