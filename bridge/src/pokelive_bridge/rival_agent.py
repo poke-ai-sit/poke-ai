@@ -39,7 +39,7 @@ TriggerType = Literal[
     "lost_battle",
     "entered_new_area",
     "first_capture",
-    "pewter_step",
+    "second_capture",
 ]
 
 _TRIGGER_DESCRIPTIONS: dict[str, str] = {
@@ -52,16 +52,18 @@ _TRIGGER_DESCRIPTIONS: dict[str, str] = {
         "and walked one tile after the catch. You are about to "
         "intercept them for the second rival battle."
     ),
-    "pewter_step": (
-        "The player just walked into Pewter City and is approaching "
-        "the gym. You are about to intercept them for the third rival battle."
+    "second_capture": (
+        "The player just caught their SECOND wild Pokemon "
+        "(party now has 3 mons total: starter + 2 wild) "
+        "and walked one tile after the catch. You are about to "
+        "intercept them for the third rival battle."
     ),
 }
 
 # Triggers that are setup events for one of the two scripted rival battles.
 # When fired, the bridge runs the counter-choice picker and includes its
 # decision in the GPT prompt so the rival's opening line can justify it.
-_BATTLE_SETUP_TRIGGERS = {"first_capture", "pewter_step"}
+_BATTLE_SETUP_TRIGGERS = {"first_capture", "second_capture"}
 
 
 _client: openai.OpenAI | None = None
@@ -183,7 +185,7 @@ def rival_react(
 
     Returns a dict with:
       - message: sanitized dialog string (≤120 chars)
-      - counter_choice: int — picker output for first_capture/pewter_step,
+      - counter_choice: int — picker output for first_capture/second_capture,
         otherwise None
       - counter_label: str | None — human-readable bucket name, for memory
     """

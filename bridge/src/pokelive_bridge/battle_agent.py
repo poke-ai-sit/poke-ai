@@ -47,8 +47,8 @@ FALLBACK_SUMMARY = "Battle ended. Memory append failed."
 
 BATTLE_ID_LABELS: dict[str, str] = {
     "battle_1_oaks_lab": "Battle 1 — Oak's Lab",
-    "battle_2_route_1": "Battle 2 — Route 1 (proactive)",
-    "battle_3_pewter": "Battle 3 — Pewter Gym entrance",
+    "battle_2_first_capture": "Battle 2 — after first capture",
+    "battle_3_second_capture": "Battle 3 — after second capture",
 }
 
 

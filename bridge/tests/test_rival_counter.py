@@ -120,8 +120,8 @@ def test_battle_index_first_capture_is_2():
     assert battle_index_for_trigger("first_capture") == 2
 
 
-def test_battle_index_pewter_step_is_3():
-    assert battle_index_for_trigger("pewter_step") == 3
+def test_battle_index_second_capture_is_3():
+    assert battle_index_for_trigger("second_capture") == 3
 
 
 def test_battle_index_unknown_returns_zero():

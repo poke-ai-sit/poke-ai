@@ -149,6 +149,6 @@ def battle_index_for_trigger(trigger: str) -> int:
     """
     if trigger == "first_capture":
         return 2
-    if trigger == "pewter_step":
+    if trigger == "second_capture":
         return 3
     return 0

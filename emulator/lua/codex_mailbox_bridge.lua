@@ -58,14 +58,13 @@ local TIMEOUT_RESPONSE_HEX = "CEE6ED00D5DBD5DDE2ADFF"
 -- ===========================================================================
 -- Two ONE-SHOT triggers fire the cinematic walk-up + Battle 2/Battle 3 setup:
 --
---   first_capture: party size goes 1 → 2 (off the canon Oak's Lab map)
---                  → wait until player walks ONE more tile → POST /rival-event
---                  → bridge picks counter_choice (anti-fire/water/grass/...)
---                  → Lua writes counterChoice to gRivalAIBuffer + arms cinematic
+--   first_capture:  party size goes 1 → 2 (off the canon Oak's Lab map)
+--                   → wait until player walks ONE more tile → POST /rival-event
+--                   → bridge picks counter_choice (anti-fire/water/grass/...)
+--                   → Lua writes counterChoice to gRivalAIBuffer + arms cinematic
 --
---   pewter_step:   player enters Pewter City (3:2)
---                  → counts 3 tile changes inside Pewter
---                  → POST /rival-event with battle 3 picker output
+--   second_capture: party size goes 2 → 3 (any map). Same 1-tile delay.
+--                   POSTs with battle 3 picker output.
 --
 -- Battle entry (any map_signature in BATTLE_ID_BY_MAP_SIGNATURE) keeps using
 -- /rival-battle-plan to populate moveScore[].
@@ -97,11 +96,6 @@ local VAR_TEMP_0_OFFSET = 0x1000
 
 -- Map signatures we care about for the new triggers.
 local OAKS_LAB_MAP_SIG     = "4:3"
-local PEWTER_CITY_MAP_SIG  = "3:2"
-
--- Pewter step counter: player must walk this many tiles inside Pewter before
--- the rival cinematic fires.
-local PEWTER_STEPS_TO_FIRE = 3
 
 -- Skip event detection during the first N frames after script load so the
 -- baseline party-size read doesn't false-fire on hot-reload.
@@ -161,20 +155,20 @@ local function is_opponent_battler(battler_id)
   return battler_id == 1 or battler_id == 3
 end
 
--- Trigger map: which (group, num) entrances start which battle.
--- Used by the watcher to tag a captured battle log with the right battle_id.
--- Hour 5/6: Battle 2 fires anywhere the player walks one tile after their
--- first capture, so we map every plausible early-game outdoor map to it.
--- Battle 3 is locked to Pewter City. Oak's Lab is the canon Battle 1.
+-- Battle 1 (Oak's Lab) is the only battle whose ID is determined purely by
+-- map. Battle 2 and Battle 3 fire anywhere the player walks one tile after
+-- their first / second wild capture, so they're keyed off the most recently
+-- fired rival trigger (see `last_rival_trigger` below) instead of map sig.
 local BATTLE_ID_BY_MAP_SIGNATURE = {
   ["4:3"]  = "battle_1_oaks_lab",   -- Professor Oak's Lab (canon)
-  ["3:0"]  = "battle_2_route_1",    -- Pallet Town
-  ["3:1"]  = "battle_2_route_1",    -- Viridian City
-  ["3:19"] = "battle_2_route_1",    -- Route 1
-  ["3:20"] = "battle_2_route_1",    -- Route 2
-  ["3:21"] = "battle_2_route_1",    -- Route 22
-  ["1:0"]  = "battle_2_route_1",    -- Viridian Forest
-  ["3:2"]  = "battle_3_pewter",     -- Pewter City (gym entrance)
+}
+
+-- Battle ID picked by which capture trigger fired most recently. Set by
+-- fire_rival_event(); read at battle entry; cleared once consumed so it
+-- doesn't bleed into a later battle.
+local BATTLE_ID_BY_TRIGGER = {
+  first_capture  = "battle_2_first_capture",
+  second_capture = "battle_3_second_capture",
 }
 
 local frame_count = 0
@@ -187,9 +181,9 @@ local warned_magic_mismatch = false
 local last_party_count = nil
 local last_map_signature = nil
 
--- Position tracker — used by both the post-capture 1-tile delay and the
--- Pewter step counter. Format: "map_group:map_num:x:y". When this string
--- changes between frames, the player has moved one tile (or warped).
+-- Position tracker — used by the post-capture 1-tile delay logic for both
+-- first_capture and second_capture triggers. Format: "map_group:map_num:x:y".
+-- When this string changes between frames, the player has moved one tile.
 local last_position_signature = nil
 
 -- first_capture state machine.
@@ -200,12 +194,15 @@ local last_position_signature = nil
 local first_capture_state = "idle"
 local first_capture_anchor_position = nil  -- position sig at the moment of catch
 
--- pewter_step state machine.
---   "idle"     : not on Pewter map
---   "counting" : on Pewter map, counting steps
---   "fired"    : POST sent. One-shot per session.
-local pewter_step_state = "idle"
-local pewter_step_count = 0
+-- second_capture state machine. Same shape as first_capture; fires on the
+-- 2 → 3 party-size transition (player's second wild catch — total mons = 3).
+local second_capture_state = "idle"
+local second_capture_anchor_position = nil
+
+-- The trigger string from the most-recently-fired rival_event. Read by the
+-- battle-entry watcher to pick battle_id (battle_2_first_capture vs.
+-- battle_3_second_capture). Cleared once consumed so it doesn't bleed.
+local last_rival_trigger = nil
 
 -- Smart Gary battle log accumulator. Cleared at battle start, sent to
 -- /rival-battle-summary at battle end.
@@ -682,6 +679,9 @@ local function fire_rival_event(trigger, state, party, details)
     "RIVAL EVENT trigger=%s map=%d:%d pos=(%d,%d)",
     trigger, state.map_group, state.map_num, state.x, state.y
   ))
+  -- Remember which trigger fired so the battle-entry watcher can tag the
+  -- log with the right battle_id when the cinematic transitions to combat.
+  last_rival_trigger = trigger
   local response, err = post_rival_event(trigger, state, party, details)
   if err then
     write_line("rival-event POST failed: " .. tostring(err))
@@ -969,7 +969,15 @@ local function check_battle_transitions()
     local sig = nil
     if state then
       sig = string.format("%d:%d", state.map_group, state.map_num)
-      current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
+      -- Trigger flag wins over map sig — Battle 2/3 can fire on any map,
+      -- only Battle 1 (Oak's Lab) is map-determined. Once consumed, clear
+      -- the flag so a later battle doesn't inherit it.
+      if last_rival_trigger and BATTLE_ID_BY_TRIGGER[last_rival_trigger] then
+        current_battle_id = BATTLE_ID_BY_TRIGGER[last_rival_trigger]
+        last_rival_trigger = nil
+      else
+        current_battle_id = BATTLE_ID_BY_MAP_SIGNATURE[sig]
+      end
     end
     if not current_battle_id then
       -- Battle is real but on a map we don't track. Still mark in_battle so
@@ -1057,9 +1065,9 @@ end
 -- Hours 5-6 trigger detection
 --
 -- Two ONE-SHOT triggers — neither re-arms after firing within a Lua session:
---   first_capture: 1 → 2 party transition off Oak's Lab, then wait one tile
---                  of player movement before POSTing /rival-event.
---   pewter_step:   on entering Pewter (3:2), count 3 tile changes, then POST.
+--   first_capture:  1 → 2 party transition off Oak's Lab, then wait one tile
+--                   of player movement before POSTing /rival-event.
+--   second_capture: 2 → 3 party transition (any map), same 1-tile delay.
 -- ---------------------------------------------------------------------------
 
 local function check_rival_triggers()
@@ -1122,39 +1130,35 @@ local function check_rival_triggers()
     return
   end
 
-  -- ----- pewter_step detector -----------------------------------------------
-  if pewter_step_state == "idle" and map_sig == PEWTER_CITY_MAP_SIG then
-    pewter_step_state = "counting"
-    pewter_step_count = 0
-    write_line("pewter_step armed: entered Pewter City — counting steps")
+  -- ----- second_capture detector --------------------------------------------
+  -- Same shape as first_capture but for the 2 → 3 transition (player's
+  -- second wild catch — party total reaches 3). Fires anywhere.
+  if second_capture_state == "idle"
+     and party_count
+     and previous_party_count
+     and previous_party_count == 2
+     and party_count == 3
+  then
+    second_capture_state = "post_catch"
+    second_capture_anchor_position = position_sig
+    write_line(string.format(
+      "second_capture armed: 3rd mon obtained at %s — waiting one tile",
+      position_sig
+    ))
   end
 
-  if pewter_step_state == "counting" then
-    if map_sig ~= PEWTER_CITY_MAP_SIG then
-      -- Player left Pewter before completing the count. Reset and re-arm
-      -- next time they enter.
-      pewter_step_state = "idle"
-      pewter_step_count = 0
-      return
-    end
-
-    if previous_position_sig
-       and previous_position_sig ~= position_sig
-    then
-      pewter_step_count = pewter_step_count + 1
-      write_line(string.format(
-        "pewter_step %d/%d", pewter_step_count, PEWTER_STEPS_TO_FIRE
-      ))
-    end
-
-    if pewter_step_count >= PEWTER_STEPS_TO_FIRE then
-      if pending then return end  -- retry next frame
-      pewter_step_state = "fired"
-      local party = read_party_data()
-      fire_rival_event("pewter_step", state, party, {
-        steps = pewter_step_count,
-      })
-    end
+  if second_capture_state == "post_catch"
+     and second_capture_anchor_position
+     and previous_position_sig
+     and position_sig ~= second_capture_anchor_position
+  then
+    if pending then return end  -- leave armed; retry next frame
+    second_capture_state = "fired"
+    local party = read_party_data()
+    fire_rival_event("second_capture", state, party, {
+      anchor = second_capture_anchor_position,
+    })
+    return
   end
 end
 
@@ -1215,7 +1219,7 @@ local function poll_pending_response()
       end
     elseif pending.label == "rival-event" then
       local message_hex = extract_json_field(response, "message_hex")
-      -- counter_choice is populated for first_capture / pewter_step setup
+      -- counter_choice is populated for first_capture / second_capture setup
       -- triggers; absent (or null) for the legacy event types. When present,
       -- write it to gRivalAIBuffer.counterChoice BEFORE arming the cinematic
       -- so the rival battle script reads the correct value if the player

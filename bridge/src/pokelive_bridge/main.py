@@ -72,7 +72,7 @@ class RivalEventRequest(BaseModel):
         "lost_battle",
         "entered_new_area",
         "first_capture",
-        "pewter_step",
+        "second_capture",
     ]
     game_state: GameStateRequest
     party: list[PartyEntryRequest] | None = None
@@ -85,7 +85,7 @@ class RivalEventResponse(BaseModel):
     message_hex: str
     action: Literal["approach", "idle"]
     game_state: GameStateRequest
-    # Populated only for battle-setup triggers (first_capture / pewter_step).
+    # Populated only for battle-setup triggers (first_capture / second_capture).
     # Lua writes this byte to gRivalAIBuffer.counterChoice so the C-side
     # battle script picks the right rival lead.
     counter_choice: int | None = None
@@ -96,7 +96,7 @@ class RivalEventResponse(BaseModel):
 # Smart Gary battle endpoints
 # ---------------------------------------------------------------------------
 
-BattleId = Literal["battle_1_oaks_lab", "battle_2_route_1", "battle_3_pewter"]
+BattleId = Literal["battle_1_oaks_lab", "battle_2_first_capture", "battle_3_second_capture"]
 
 
 class BattleMonState(BaseModel):
