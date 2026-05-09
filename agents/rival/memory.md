@@ -62,3 +62,9 @@ Move log:
   T1 PLAYER CHARMANDER used MOVE_10
 Summary: I used Squirtle with Tackle to defeat Charmander again. My water type advantage proved too strong, maintaining my lead over the player's fire type.
 Lessons: Player still relies on fire type Charmander. I'll continue using water types like Squirtle to exploit this weakness in further battles.
+
+## 2026-05-09T03:55
+Trigger: entered_new_area
+Details: from_map=Route 22 (3:41), to_map=Viridian City (3:1)
+Map: Viridian City (3:1)
+Rival said: Viridian City. Seen it. Beat it.
