@@ -1078,17 +1078,22 @@ local function check_battle_transitions()
 
   if outcome ~= BATTLE_OUTCOME_IN_PROGRESS then
     if in_battle then
-      -- EXIT — fire summary
+      -- EXIT. Fire the summary + log lines only for tracked rival battles —
+      -- wild encounters / random trainers should leave no trace in the
+      -- console (the in_battle flag still has to flip back so the
+      -- check_rival_triggers gate releases for the post-catch detector).
       local outcome_label = "lost"
       if outcome == BATTLE_OUTCOME_WON then outcome_label = "won"
       elseif outcome == BATTLE_OUTCOME_RAN then outcome_label = "fled"
       end
-      write_line(string.format(
-        "BATTLE END: outcome=%d label=%s log_entries=%d",
-        outcome, outcome_label, #battle_log
-      ))
-      if current_battle_id and #battle_log > 0 then
-        post_rival_battle_summary(current_battle_id, outcome_label, battle_log, nil)
+      if current_battle_id then
+        write_line(string.format(
+          "BATTLE END: outcome=%d label=%s log_entries=%d",
+          outcome, outcome_label, #battle_log
+        ))
+        if #battle_log > 0 then
+          post_rival_battle_summary(current_battle_id, outcome_label, battle_log, nil)
+        end
       end
       reset_battle_state()
     end
@@ -1121,12 +1126,15 @@ local function check_battle_transitions()
       end
     end
     if not current_battle_id then
-      -- Battle is real but on a map we don't track. Still mark in_battle so
-      -- exit detection works, but skip plan + summary POSTs.
+      -- Battle is real but it's a wild encounter or random trainer fight, not
+      -- one of our scripted rival battles. Mark in_battle so exit detection
+      -- still releases the post-catch trigger, but suppress every log line
+      -- (BATTLE START, per-turn move log, BATTLE END) because the demo only
+      -- cares about player-vs-rival fights. battle_log stays empty so the
+      -- mid-battle move loop has nothing to append into either.
       in_battle = true
       current_turn = 1
       battle_log = {}
-      write_line(string.format("BATTLE START: id=<untracked> map=%s", tostring(sig)))
       return
     end
 
@@ -1185,6 +1193,11 @@ local function check_battle_transitions()
   end
 
   -- Mid-battle: detect new player and opponent move selections.
+  -- Wild encounters and random trainer fights are tagged with current_battle_id
+  -- == nil; skip move logging entirely for those (Edmund's spec: only the
+  -- player-vs-rival fights leave a trail).
+  if not current_battle_id then return end
+
   local attacker = read_battler_attacker()
   local current_move = read_current_move()
 
