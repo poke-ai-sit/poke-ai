@@ -5,8 +5,11 @@ local PORT = 8000
 local SAVE_BLOCK_1_PTR = 0x03005008
 
 -- EWRAM addresses from pokefirered_modern.map (MODERN=1 build 2026-05-09, arm-none-eabi-gcc 15.2.0)
-local CODEX_MAILBOX_ADDR = 0x020218f0  -- gPokeliveCodexMailbox
-local PARTY_DATA_ADDR    = 0x02021a20  -- gPokelivePartyData
+-- Addresses re-verified from pokefirered.map after the MODERN build merged in
+-- the AI-Rival + Evolve features. Old values 0x020218f0 / 0x02021a20 pointed
+-- into the generic EWRAM string region — wrong region entirely.
+local CODEX_MAILBOX_ADDR = 0x0203F4AC  -- gPokeliveCodexMailbox
+local PARTY_DATA_ADDR    = 0x0203F5DC  -- gPokelivePartyData
 
 -- gPokelivePartyData struct constants
 local POKELIVE_PARTY_MAGIC = 0x50415254  -- "PART"
@@ -80,8 +83,12 @@ local TIMEOUT_RESPONSE_HEX = "CEE6ED00D5DBD5DDE2ADFF"
 -- Lua transitions IDLE → APPROACH_PENDING by writing magic + message + length
 -- + status, then flipping VAR_TEMP_0=1 in SaveBlock1.vars[0] to trigger the
 -- map_script_2 entry that the ROM team adds for each cinematic map.
--- Address from pokefirered_modern.map (MODERN=1 build 2026-05-09).
-local RIVAL_ENCOUNTER_BUFFER_ADDR    = 0x02021ad0  -- gRivalEncounterBuffer
+-- Address from pokefirered.map (MODERN=1 build 2026-05-09).
+-- Previous value 0x02021ad0 was wrong — that region is a generic string buffer.
+-- Wrong writes there corrupted the textbox engine and black-screened the game
+-- the moment EventScript_AIRivalPhoneCall ran. Real symbol address re-grepped
+-- from pokefirered.map after the merged build.
+local RIVAL_ENCOUNTER_BUFFER_ADDR    = 0x0203F68C  -- gRivalEncounterBuffer
 local RIVAL_ENCOUNTER_MAGIC          = 0x52454E43  -- "RENC"
 local RIVAL_ENCOUNTER_STATUS_PENDING = 1
 local RIVAL_ENCOUNTER_MESSAGE_MAX    = 200
@@ -143,8 +150,12 @@ local CHOSEN_MOVE_OFFSET      = 0x87        -- chosenMovePositions[battler] u8
 local BATTLE_MONS_ADDR        = 0x02023C04  -- gBattleMons[0]
 local BATTLE_MON_STRIDE       = 0x58        -- 88 bytes per BattlePokemon
 
--- gRivalAIBuffer (pokefirered_modern.map, MODERN=1 build 2026-05-09).
-local RIVAL_AI_BUFFER_ADDR    = 0x02021ba0
+-- gRivalAIBuffer (pokefirered.map, MODERN=1 build 2026-05-09).
+-- Previous value 0x02021ba0 was wrong; counterChoice + move scores were
+-- being written into stale generic EWRAM, so C-side reads returned 0 and
+-- the trainer dispatch always fell through to case 0 (anti-fire) regardless
+-- of what the bridge picked.
+local RIVAL_AI_BUFFER_ADDR    = 0x0203F7F4
 local RIVAL_AI_BUFFER_MAGIC   = 0x52414942  -- "RAIB"
 
 -- Field offsets within each gBattleMons[i] entry
