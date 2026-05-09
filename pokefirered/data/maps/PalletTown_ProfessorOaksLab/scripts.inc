@@ -1237,7 +1237,7 @@ PalletTown_ProfessorOaksLab_EventScript_ChoseStarter::
 	@ moveset is the last 4 entries of the level-up learnset by the time level
 	@ 100 is reached, so PRATA / BULBASAUR / FRANKSON all walk out with their
 	@ endgame statline + endgame attacks.
-	givemon PLAYER_STARTER_SPECIES, 100
+	givemon PLAYER_STARTER_SPECIES, 10
 	copyvar VAR_STARTER_MON, PLAYER_STARTER_NUM
 	bufferspeciesname STR_VAR_1, PLAYER_STARTER_SPECIES
 	message PalletTown_ProfessorOaksLab_Text_ReceivedMonFromOak

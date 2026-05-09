@@ -14,36 +14,48 @@ Each entry is a markdown section with a UTC timestamp header followed by structu
 
 ## Log
 
-## 2026-05-09T07:56 — Battle 1 — Oak's Lab (PLAN)
+## 2026-05-09T08:30 — Battle 1 — Oak's Lab (PLAN)
 Counter choice: party slot 0
-Move score boosts: [-20, 5, 5, -20]
-Reasoning: Player leads Prata, a Fire-type Pokémon. → Frankson is Normal type with Tackle. → Prata's Flamethrower is too strong. → Minimize damage by boosting Frankson's Tail Whip.
-Strategy: Player's Prata has a fire advantage with high-level moves. Frankson, my Normal type, can't deal damage effectively. I'll weaken Prata's defense with Tail Whip to reduce incoming damage slightly, but acknowledge that this is a tough battle given the level disparity.
+Move score boosts: [0, -20, 0, -20]
+Reasoning: Player leads PRATA, a Fire type. → FRANKSON, my Rattata, knows Normal moves. → No type advantage against Fire. → Suppression needed to mitigate damage.
+Strategy: PRATA's Fire moves are strong against FRANKSON. With only Tackle and Tail Whip available, FRANKSON has no type advantage over Fire. Suppressing Tail Whip and relying on Tackle to deal damage reflects the current lack of better alternatives. The goal is to evaluate the player's strategy and prepare for stronger counters in the future.
 
-## 2026-05-09T07:56 — Battle 1 — Oak's Lab (RESULT)
+## 2026-05-09T08:30 — Battle 1 — Oak's Lab (RESULT)
 Outcome (rival): LOST
 Outcome (player): WON
 Turns: 2
 Move log:
   T1 RIVAL FRANKSON used MOVE_33
   T2 PLAYER PRATA used MOVE_53
-Summary: Lost to the player's Prata. My Frankson couldn't handle Prata's Flamethrower and was defeated quickly.
-Lessons: Player uses Prata, a Fire-type with strong attacks. Next time I'll choose a Water or Rock type to counter effectively.
+Summary: FRANKSON lost to PRATA. Used MOVE_33 but didn't manage to counter the player's MOVE_53.
+Lessons: Player favors strength in moves. Next time, select a species with a type advantage over PRATA's strengths.
 
-## 2026-05-09T07:57
+## 2026-05-09T08:31
 Trigger: first_capture
-Details: anchor=3:19:8:35, tiles=2
+Details: anchor=3:19:7:35, tiles=2
 Map: Route 1 (3:19)
 Player party size: 2
 Player party: PRATA L100, PIDGEY L3
 Counter pick: B2 rival-Squirt + anti-Flying (counterChoice=3)
-Call page 1: Your Pokegear rings suddenly.
-Call page 2: Its GEMINI your rival.
-Call page 3: On my way. Prepare for a challenge.
-Rival said: Pidgey. Weak. I have a Rattata.
+Call page 1: Brrr brrr. Pokegear vibrating.
+Call page 2: GEMINI calling. Static on the line.
+Call page 3: Are you still on Route 1. Coming for you.
+Rival said: Pidgey. I chose Squirt. Water washes Air.
 
-## 2026-05-09T07:57 — Battle 2 — after first capture (PLAN)
+## 2026-05-09T08:31 — Battle 2 — after first capture (PLAN)
 Counter choice: party slot 0
-Move score boosts: [-20, -20, -20, -20]
-Reasoning: Player leads Prata a high-level Fire-type → My Pidgey is not effective against Fire → Suppression to Tackle to avoid hopeless battle
-Strategy: My Pidgey cannot effectively counter the player's Prata due to its high level and strong Fire-type moves. To minimize damage, I will suppress Pidgey's Tackle since it's futile.
+Move score boosts: [20, -20, -20, -20]
+Reasoning: Player leads PRATA (Fire type) → I lead with Pidgey, shared level 3 → Pidgey uses Normal vs Fire, no advantage → Focus on using Tackle, best move available
+Strategy: Despite Pidgey sharing the level and having Tackle, there is no type advantage against PRATA's Fire type. Given no advantageous type matchup, leverage Tackle as the best option to deal effective damage given current limitations.
+
+## 2026-05-09T08:31 — Battle 2 — after first capture (RESULT)
+Outcome (rival): LOST
+Outcome (player): WON
+Turns: 4
+Move log:
+  T1 RIVAL FRANKSON used MOVE_145
+  T2 PLAYER PRATA used MOVE_53
+  T2 RIVAL GEODUDE used MOVE_33
+  T3 PLAYER PRATA used MOVE_83
+Summary: FRANKSON and GEODUDE both fell to PRATA swiftly. PRATA's Fire-type moves were too strong, and my Normal-type moves didn't counter effectively.
+Lessons: Player relies on PRATA's Fire power. Next time, prioritize Water or Rock-type moves for an effective counter.

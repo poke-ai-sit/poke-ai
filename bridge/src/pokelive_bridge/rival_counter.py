@@ -140,13 +140,15 @@ STARTER_COUNTER: dict[int, int] = {
 }
 _STARTER_DEFAULT = SPECIES_BULBASAUR
 
-# Player caught species -> rival counter species (slot 1+).
+# Per Edmund's demo spec: rival's slot 1+ is ALWAYS Pikachu, regardless of
+# what the player caught. Map kept for future per-catch tuning, but currently
+# every entry resolves to Pikachu so the table can be reintroduced quickly.
 CATCH_COUNTER: dict[int, int] = {
     SPECIES_PIDGEY:    SPECIES_PIKACHU,
     SPECIES_PIDGEOTTO: SPECIES_PIKACHU,
     SPECIES_PIDGEOT:   SPECIES_PIKACHU,
-    SPECIES_RATTATA:   SPECIES_MACHOP,
-    SPECIES_RATICATE:  SPECIES_MACHOP,
+    SPECIES_RATTATA:   SPECIES_PIKACHU,
+    SPECIES_RATICATE:  SPECIES_PIKACHU,
 }
 _CATCH_DEFAULT = SPECIES_PIKACHU
 
