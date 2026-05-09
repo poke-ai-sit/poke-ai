@@ -68,3 +68,19 @@ Trigger: entered_new_area
 Details: from_map=Route 22 (3:41), to_map=Viridian City (3:1)
 Map: Viridian City (3:1)
 Rival said: Viridian City. Seen it. Beat it.
+
+## 2026-05-09T04:07 — Battle 1 — Oak's Lab (PLAN)
+Counter choice: party slot 0
+Move score boosts: [10, 0, -20, 0]
+Strategy: Player chose Squirtle as their starter. I'll lead with Bulbasaur which has a type counter advantage with its Grass type. I'll prioritize Tackle to inflict consistent damage. Already beaten the player with Squirtle. This time to use Bulbasaur's potential in Oak's Lab battle.
+
+## 2026-05-09T04:09 — Battle 1 — Oak's Lab (RESULT)
+Outcome: WON
+Turns: 4
+Move log:
+  T1 RIVAL BULBASAUR used MOVE_33
+  T2 PLAYER SQUIRTLE used MOVE_33
+  T2 PLAYER SQUIRTLE used MOVE_39
+  T2 PLAYER SQUIRTLE used MOVE_33
+Summary: I used Squirtle and easily overcame the player's Charmander in our first battle in Oak's Lab.
+Lessons: The player favors fire types like Charmander. In future battles, I'll counter with water types like Wartortle for an advantage.
