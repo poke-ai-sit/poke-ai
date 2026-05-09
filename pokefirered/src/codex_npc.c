@@ -270,7 +270,6 @@ void BufferRivalMessage(void)
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
 }
 
-<<<<<<< HEAD
 /* Pokegear-style multi-page call dialogue (Hours 5-6). The script does:
  *   special ResetRivalCallPageIndex
  *   special BufferRivalCallNextPage  ; advances index, copies into gStringVar1
@@ -320,7 +319,11 @@ void BufferRivalCallNextPage(void)
 void GetAIRivalCounterChoice(void)
 {
     gSpecialVar_Result = gRivalAIBuffer.counterChoice;
-=======
+}
+
+/* Sprint-004 EVOLVE — Prata (Charmander) → Prata Pro (Charmeleon).
+ * Scans the player party for the first Charmander, swaps the species,
+ * recalculates stats, and reports success/failure via gSpecialVar_Result. */
 void EvolveCustomPokemon(void)
 {
     u16 species;
@@ -340,5 +343,4 @@ void EvolveCustomPokemon(void)
         }
     }
     gSpecialVar_Result = FALSE;
->>>>>>> feat/004-AI-Pokémon-Creator
 }
