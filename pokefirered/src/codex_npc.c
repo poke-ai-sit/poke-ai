@@ -261,3 +261,19 @@ void BufferRivalMessage(void)
         StringCopy(gStringVar1, gRivalEncounterBuffer.message);
     gRivalEncounterBuffer.status = RIVAL_ENCOUNTER_STATUS_IDLE;
 }
+
+/* Smart Gary AI Rival — counterChoice → trainer-id dispatcher.
+ * Reads gRivalAIBuffer.counterChoice (0..11) and returns the resolved
+ * trainer ID via gSpecialVar_Result. The map_script_2 then uses a
+ * `switch + case` ladder on VAR_RESULT to invoke the correct
+ * trainerbattle (the trainer ID is required as a script-time immediate
+ * in the trainerbattle bytecode, so we cannot patch it dynamically).
+ *
+ * If counterChoice is out of range we fall back to the BALANCED variant
+ * appropriate for the current battle tier. Lua chooses tier (B2 vs B3)
+ * by writing 0..5 or 6..11 to counterChoice.
+ */
+void GetAIRivalCounterChoice(void)
+{
+    gSpecialVar_Result = gRivalAIBuffer.counterChoice;
+}

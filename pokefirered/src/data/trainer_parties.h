@@ -10860,3 +10860,233 @@ static const struct TrainerMonNoItemDefaultMoves sParty_CueBallPaxton[] = {
         .species = SPECIES_MUK,
     },
 };
+
+/* PokeLive Smart Gary AI Rival — Battle 2 (low level 7-9, anywhere after first capture) */
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2AntiFire[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_SQUIRTLE,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_GEODUDE,
+        .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2AntiWater[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_BULBASAUR,
+        .moves = {MOVE_TACKLE, MOVE_GROWL, MOVE_LEECH_SEED, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_MANKEY,
+        .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_NONE},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2AntiGrass[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_CHARMANDER,
+        .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_PIDGEY,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_NONE},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2AntiFlying[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_PIKACHU,
+        .moves = {MOVE_THUNDER_SHOCK, MOVE_GROWL, MOVE_TAIL_WHIP, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_GEODUDE,
+        .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_NONE, MOVE_NONE},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2AntiBug[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_PIDGEY,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_CHARMANDER,
+        .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_NONE},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB2Balanced[] = {
+    {
+        .iv = 100,
+        .lvl = 9,
+        .species = SPECIES_SQUIRTLE,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 7,
+        .species = SPECIES_RATTATA,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_QUICK_ATTACK, MOVE_NONE},
+    },
+    {
+        .iv = 100,
+        .lvl = 8,
+        .species = SPECIES_PIDGEY,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_NONE},
+    },
+};
+
+/* PokeLive Smart Gary AI Rival — Battle 3 (mid level 11-13, Pewter Gym) */
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3AntiFire[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_WARTORTLE,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_WITHDRAW},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_GEODUDE,
+        .moves = {MOVE_TACKLE, MOVE_DEFENSE_CURL, MOVE_ROCK_THROW, MOVE_NONE},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_ONIX,
+        .moves = {MOVE_TACKLE, MOVE_SCREECH, MOVE_BIND, MOVE_ROCK_THROW},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3AntiWater[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_IVYSAUR,
+        .moves = {MOVE_TACKLE, MOVE_LEECH_SEED, MOVE_VINE_WHIP, MOVE_GROWL},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_MANKEY,
+        .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_KARATE_CHOP},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_PIDGEOTTO,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_QUICK_ATTACK},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3AntiGrass[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_CHARMELEON,
+        .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_LEER},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_PIDGEOTTO,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_QUICK_ATTACK},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_SPEAROW,
+        .moves = {MOVE_PECK, MOVE_GROWL, MOVE_LEER, MOVE_FURY_ATTACK},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3AntiFlying[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_PIKACHU,
+        .moves = {MOVE_THUNDER_SHOCK, MOVE_THUNDER_WAVE, MOVE_QUICK_ATTACK, MOVE_TAIL_WHIP},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_ONIX,
+        .moves = {MOVE_TACKLE, MOVE_SCREECH, MOVE_BIND, MOVE_ROCK_THROW},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_MANKEY,
+        .moves = {MOVE_SCRATCH, MOVE_LEER, MOVE_LOW_KICK, MOVE_KARATE_CHOP},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3AntiBug[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_PIDGEOTTO,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_QUICK_ATTACK},
+    },
+    {
+        .iv = 150,
+        .lvl = 12,
+        .species = SPECIES_CHARMELEON,
+        .moves = {MOVE_SCRATCH, MOVE_GROWL, MOVE_EMBER, MOVE_LEER},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_SANDSHREW,
+        .moves = {MOVE_SCRATCH, MOVE_DEFENSE_CURL, MOVE_SAND_ATTACK, MOVE_POISON_STING},
+    },
+};
+
+static const struct TrainerMonNoItemCustomMoves sParty_AIRivalB3Balanced[] = {
+    {
+        .iv = 150,
+        .lvl = 13,
+        .species = SPECIES_WARTORTLE,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_BUBBLE, MOVE_WITHDRAW},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_PIDGEY,
+        .moves = {MOVE_TACKLE, MOVE_SAND_ATTACK, MOVE_GUST, MOVE_QUICK_ATTACK},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_RATTATA,
+        .moves = {MOVE_TACKLE, MOVE_TAIL_WHIP, MOVE_QUICK_ATTACK, MOVE_HYPER_FANG},
+    },
+    {
+        .iv = 150,
+        .lvl = 11,
+        .species = SPECIES_SPEAROW,
+        .moves = {MOVE_PECK, MOVE_GROWL, MOVE_LEER, MOVE_FURY_ATTACK},
+    },
+};

@@ -1,5 +1,41 @@
 PewterCity_Gym_MapScripts::
+	map_script MAP_SCRIPT_ON_LOAD, PewterCity_Gym_OnLoad
+	map_script MAP_SCRIPT_ON_FRAME_TABLE, PewterCity_Gym_OnFrame
 	.byte 0
+
+PewterCity_Gym_OnLoad::
+	setflag FLAG_HIDE_PEWTER_GYM_AI_RIVAL
+	end
+
+PewterCity_Gym_OnFrame::
+	map_script_2 VAR_TEMP_0, 1, PewterCity_Gym_EventScript_AIRivalEncounter
+	.2byte 0
+
+@ PokeLive Smart Gary AI Rival — Battle 3 cinematic.
+@ Lua sets VAR_TEMP_0=1 after the player has taken 3 steps inside the gym.
+@ Rival warps in 2 tiles below+right of the player, walks 2 tiles toward them,
+@ delivers the GPT taunt, and battles using the Lua-selected counter team.
+@ Brock is untouched — the player continues to the gym leader normally.
+PewterCity_Gym_EventScript_AIRivalEncounter::
+	lockall
+	getplayerxy VAR_0x8004, VAR_0x8005
+	addvar VAR_0x8005, 2
+	setobjectxyperm LOCALID_PEWTER_GYM_AI_RIVAL, VAR_0x8004, VAR_0x8005
+	setobjectmovementtype LOCALID_PEWTER_GYM_AI_RIVAL, MOVEMENT_TYPE_FACE_UP
+	playse SE_WARP_IN
+	addobject LOCALID_PEWTER_GYM_AI_RIVAL
+	applymovement LOCALID_PEWTER_GYM_AI_RIVAL, PewterCity_Gym_Movement_AIRivalApproach
+	waitmovement 0
+	call EventScript_AIRivalEncounterCinematic
+	removeobject LOCALID_PEWTER_GYM_AI_RIVAL
+	setflag FLAG_HIDE_PEWTER_GYM_AI_RIVAL
+	setvar VAR_TEMP_0, 0
+	releaseall
+	end
+
+PewterCity_Gym_Movement_AIRivalApproach::
+	walk_up
+	step_end
 
 PewterCity_Gym_EventScript_Brock::
 	famechecker FAMECHECKER_BROCK, FCPICKSTATE_COLORED, UpdatePickStateFromSpecialVar8005
